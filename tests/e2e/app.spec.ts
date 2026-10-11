@@ -1,30 +1,28 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 // End-to-end walk-through against a running app + Supabase stack.
-// Expects the database freshly reset and the admin bootstrapped as kartik / ADMIN_PASSWORD / 111.
-const ADMIN = { user: 'kartik', password: process.env.E2E_ADMIN_PASSWORD ?? 'Admin-local-2026', pin: '111' };
-const PEOPLE = {
-  Shruti: { user: 'shruti', password: 'Shruti-temp-2026', pin: '222' },
-  Dev: { user: 'dev', password: 'Dev-temp-20261', pin: '444' },
-  Zinia: { user: 'zinia', password: 'Zinia-temp-2026', pin: '555' },
+// Expects the database freshly reset and the admin bootstrapped as kartik / PIN 111.
+type Person = { user: string; pin: string };
+const ADMIN: Person = { user: 'kartik', pin: '111' };
+const PEOPLE: Record<string, Person> = {
+  Shruti: { user: 'shruti', pin: '222' },
+  Dev: { user: 'dev', pin: '444' },
+  Zinia: { user: 'zinia', pin: '555' },
 };
 const SHOTS = process.env.E2E_SHOTS ?? 'test-results/screens';
 
 test.describe.configure({ mode: 'serial' });
 
-async function signIn(page: Page, who: { user: string; password: string; pin: string }) {
+async function signIn(page: Page, who: Person) {
   await page.goto('/login');
   await page.getByLabel('Username').fill(who.user);
-  await page.getByLabel('Password').fill(who.password);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.waitForURL('**/verify');
   await page.getByLabel('PIN').fill(who.pin);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL((u) => u.pathname === '/');
   await expect(page.getByRole('heading', { name: /^Hello, / })).toBeVisible();
 }
 
-async function as(browser: Browser, who: { user: string; password: string; pin: string }, mobile = false) {
+async function as(browser: Browser, who: Person, mobile = false) {
   const ctx = await browser.newContext(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : {});
   const page = await ctx.newPage();
   await signIn(page, who);
@@ -40,24 +38,27 @@ function isoIn(days: number) {
 let taskUrl = '';
 let backlogUrl = '';
 
-test('signed-out visitors are sent to login; bad password is rejected generically', async ({ page }) => {
+test('signed-out visitors are sent to login; a wrong PIN or unknown user is rejected generically', async ({ page }) => {
   await page.goto('/tasks');
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel('Username').fill('kartik');
-  await page.getByLabel('Password').fill('wrong-password-1');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.locator('form [role=alert]')).toHaveText('Username or password is incorrect.');
+  await page.getByLabel('PIN').fill('999');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.locator('form [role=alert]')).toHaveText('Username or PIN is incorrect.');
+  await page.getByLabel('Username').fill('nobody');
+  await page.getByLabel('PIN').fill('111');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.locator('form [role=alert]')).toHaveText('Username or PIN is incorrect.');
   await page.screenshot({ path: `${SHOTS}/01-login.png` });
 });
 
-test('admin signs in with password + PIN and creates logins from the Team page', async ({ browser }) => {
+test('admin signs in with username + PIN and creates logins from the Team page', async ({ browser }) => {
   const page = await as(browser, ADMIN);
   await expect(page.getByRole('heading', { name: 'Hello, Kartik' })).toBeVisible();
   for (const [name, p] of Object.entries(PEOPLE)) {
     await page.goto('/team');
     await page.getByRole('link', { name, exact: true }).click();
     await page.getByLabel('Username').fill(p.user);
-    await page.getByLabel('Temporary password').fill(p.password);
     await page.getByLabel('3-digit PIN').fill(p.pin);
     await page.getByRole('button', { name: 'Create login' }).click();
     await expect(page.getByText(`Username: ${p.user}`)).toBeVisible();
@@ -176,21 +177,29 @@ test('mobile layout works', async ({ browser }) => {
   await page.screenshot({ path: `${SHOTS}/09-mobile-board.png`, fullPage: true });
 });
 
-test('five wrong PINs lock the account', async ({ page }) => {
+test('five wrong PINs lock the account until the admin resets the PIN', async ({ page, browser }) => {
   await page.goto('/login');
-  await page.getByLabel('Username').fill(PEOPLE.Zinia.user);
-  await page.getByLabel('Password').fill(PEOPLE.Zinia.password);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.waitForURL('**/verify');
   for (let i = 0; i < 5; i++) {
+    await page.getByLabel('Username').fill(PEOPLE.Zinia.user);
     await page.getByLabel('PIN').fill('999');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.locator('form [role=alert]')).toBeVisible();
   }
-  await expect(page.locator('form [role=alert]')).toContainText('Too many wrong PINs');
+  await expect(page.locator('form [role=alert]')).toContainText('locked after too many wrong PINs');
+  await page.getByLabel('Username').fill(PEOPLE.Zinia.user);
   await page.getByLabel('PIN').fill(PEOPLE.Zinia.pin);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.locator('form [role=alert]')).toContainText('Too many wrong PINs');
+  await expect(page.locator('form [role=alert]')).toContainText('locked after too many wrong PINs');
+
+  const admin = await as(browser, ADMIN);
+  await admin.goto('/team');
+  await admin.getByRole('link', { name: 'Zinia', exact: true }).click();
+  await expect(admin.getByText('Locked after 5 wrong PINs')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/10-locked-member.png`, fullPage: true });
+  await admin.getByLabel('New PIN').fill(PEOPLE.Zinia.pin);
+  await admin.getByRole('button', { name: 'Reset PIN' }).click();
+  await expect(admin.getByText('PIN reset and lockout cleared.')).toBeVisible();
+  await signIn(page, PEOPLE.Zinia);
 });
 
 test('deactivating a member cuts off their open session', async ({ browser }) => {

@@ -5,6 +5,7 @@
 // It refuses to run once an admin login exists. Add everyone else from the Team page.
 import { createClient } from '@supabase/supabase-js';
 import readline from 'node:readline';
+import { randomBytes } from 'node:crypto';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,11 +43,6 @@ if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
   console.error('Username must be 3-32 lowercase letters, digits, dot, dash or underscore.');
   process.exit(1);
 }
-const password = await ask({ key: 'PASSWORD', text: 'Password (10+ chars, letters and digits): ' }, { hidden: true });
-if (password.length < 10 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
-  console.error('Password must be at least 10 characters and include a letter and a digit.');
-  process.exit(1);
-}
 const pin = await ask({ key: 'PIN', text: '3-digit PIN: ' }, { hidden: true });
 if (!/^\d{3}$/.test(pin)) {
   console.error('PIN must be exactly 3 digits.');
@@ -55,7 +51,8 @@ if (!/^\d{3}$/.test(pin)) {
 
 const { data: created, error: cErr } = await supabase.auth.admin.createUser({
   email: `${username}@users.opspulse.invalid`,
-  password,
+  // Sign-in is username + PIN; this password is never used, it only has to be unguessable.
+  password: randomBytes(32).toString('base64url'),
   email_confirm: true,
   app_metadata: { provisioned_by: 'opspulse-bootstrap' },
 });
@@ -74,4 +71,4 @@ if (bErr) {
   console.error(`Not completed: ${bErr.message}`);
   process.exit(1);
 }
-console.log(`Done. ${name} can now sign in as "${username}" with that password and PIN.`);
+console.log(`Done. ${name} can now sign in as "${username}" with that PIN.`);

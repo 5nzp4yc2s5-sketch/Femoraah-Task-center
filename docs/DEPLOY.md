@@ -24,7 +24,7 @@ You never paste secrets into chat or commit them to GitHub; they go only into th
 Either option works.
 
 **Option A, no tools needed (dashboard):**
-1. **Authentication → Users → Add user → Create new user**: email `kartik@users.opspulse.invalid`, a strong password (10+ chars, letters and digits), tick **Auto Confirm User**.
+1. **Authentication → Users → Add user → Create new user**: email `kartik@users.opspulse.invalid`, any long random password (it is never used: sign-in is username + PIN), tick **Auto Confirm User**.
 2. **SQL Editor**, run (pick your own PIN instead of 000):
    ```sql
    select public.service_bootstrap_admin(
@@ -58,15 +58,15 @@ Uses the OpenNext adapter: `npm i -D @opennextjs/cloudflare wrangler`, add a `wr
 
 ## 6. Add the team
 
-Sign in as Kartik → **Team** → click a name → **Login**: choose a username (e.g. `zinia`), a temporary password and a 3-digit PIN → **Create login**. Tell each person their username, password and PIN **in person**, then ask them to change the password and PIN from **Account**. The five people from the spreadsheet are already in the Team table with their roles, expertise and capacities; **Add member** creates new people. Promote someone to manager on their Team page if they should approve backlog items.
+Sign in as Kartik → **Team** → click a name → **Login**: choose a username (e.g. `zinia`) and a 3-digit PIN → **Create login**. Tell each person their username and PIN **in person**, then ask them to change the PIN from **Account**. If someone is locked out after 5 wrong PINs, their Team page says so; set a new PIN there to unlock them. The five people from the spreadsheet are already in the Team table with their roles, expertise and capacities; **Add member** creates new people. Promote someone to manager on their Team page if they should approve backlog items.
 
 Backups on Free: **Database → Backups** is not included, so run `npx supabase db dump --data-only -f backup.sql` (or Table Editor → Export CSV) weekly.
 
 ## 7. Verify production (5 minutes)
 
 1. Open the URL signed out → you land on the sign-in page.
-2. Sign in as Kartik (password, then PIN) → Dashboard shows 5 people and "12 records need review".
+2. Sign in as Kartik (username and PIN) → Dashboard shows 5 people and "12 records need review".
 3. Create a login for one teammate; in a private window sign in as them and confirm they see only their own tasks and routines.
 4. Create a task for them as Kartik; confirm it appears for them, and that "Tasks I assigned to others" shows it for you.
 5. Have them add a backlog item; approve it as Kartik; confirm exactly one task appears.
-6. Enter a wrong PIN five times in a private window → the account locks for 15 minutes.
+6. Enter a wrong PIN five times in a private window → the account locks until you reset that PIN on the Team page.

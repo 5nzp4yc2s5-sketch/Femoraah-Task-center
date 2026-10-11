@@ -51,7 +51,7 @@ describe('authentication gates', () => {
     expect(error?.message).toMatch(/Managers only/);
   });
 
-  it('wrong PINs lock the account for 15 minutes, even with the right PIN afterwards', async () => {
+  it('wrong PINs lock the account until an admin resets the PIN, even with the right PIN afterwards', async () => {
     const s = await signIn('Shruti');
     for (let i = 0; i < 4; i++) {
       const { data } = await s.rpc('verify_pin', { p_pin: '999' });
@@ -64,6 +64,64 @@ describe('authentication gates', () => {
     expect(right.error).toBe('locked');
     const { data: rows } = await s.from('tasks').select('*');
     expect(rows ?? []).toHaveLength(0);
+
+    const k = await login('Kartik');
+    expect((await k.rpc('admin_pin_locked', { p_member: ids.Shruti })).data).toBe(true);
+    await db.query(`update public.member_pins set locked_until = now() + interval '1 year' where member_id = $1`, [ids.Shruti]);
+    expect((await s.rpc('verify_pin', { p_pin: '222' })).data.error).toBe('locked');
+    expect((await k.rpc('admin_set_pin', { p_member: ids.Shruti, p_pin: '222' })).error).toBeNull();
+    expect((await k.rpc('admin_pin_locked', { p_member: ids.Shruti })).data).toBe(false);
+    expect((await s.rpc('verify_pin', { p_pin: '222' })).data.ok).toBe(true);
+  });
+
+  it('PIN-only sign-in check: the right PIN returns the login email; wrong PIN or unknown user does not', async () => {
+    const { data: ok } = await admin.rpc('service_pin_login', { p_identifier: 'Zinia', p_pin: '555' });
+    expect(ok).toEqual({ ok: true, email: 'zinia@test.opspulse.local' });
+    const { data: byEmail } = await admin.rpc('service_pin_login', { p_identifier: 'zinia@test.opspulse.local', p_pin: '555' });
+    expect(byEmail.ok).toBe(true);
+    const { data: wrong } = await admin.rpc('service_pin_login', { p_identifier: 'zinia', p_pin: '554' });
+    expect(wrong).toEqual({ ok: false, error: 'invalid' });
+    const { data: nobody } = await admin.rpc('service_pin_login', { p_identifier: 'nobody', p_pin: '555' });
+    expect(nobody).toEqual({ ok: false, error: 'invalid' });
+    const { data: junk } = await admin.rpc('service_pin_login', { p_identifier: 'zinia', p_pin: "' or 1=1 --" });
+    expect(junk.ok).toBe(false);
+  });
+
+  it('five wrong PINs at sign-in lock the account until an admin resets it', async () => {
+    for (let i = 0; i < 4; i++) {
+      expect((await admin.rpc('service_pin_login', { p_identifier: 'dev', p_pin: '000' })).data.error).toBe('invalid');
+    }
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'dev', p_pin: '000' })).data.error).toBe('locked');
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'dev', p_pin: '444' })).data.error).toBe('locked');
+    const k = await login('Kartik');
+    await k.rpc('admin_set_pin', { p_member: ids.Dev, p_pin: '444' });
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'dev', p_pin: '444' })).data.ok).toBe(true);
+  });
+
+  it('a successful PIN check resets the wrong-PIN count', async () => {
+    for (let i = 0; i < 4; i++) await admin.rpc('service_pin_login', { p_identifier: 'sanket', p_pin: '000' });
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'sanket', p_pin: '333' })).data.ok).toBe(true);
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'sanket', p_pin: '000' })).data.error).toBe('invalid');
+  });
+
+  it('deactivated members cannot sign in with their PIN', async () => {
+    await db.query('update public.members set is_active = false where id = $1', [ids.Zinia]);
+    expect((await admin.rpc('service_pin_login', { p_identifier: 'zinia', p_pin: '555' })).data.error).toBe('invalid');
+  });
+
+  it('the server-minted session (magic-link token, no password) is a normal session that still needs the PIN', async () => {
+    const { data: check } = await admin.rpc('service_pin_login', { p_identifier: 'zinia', p_pin: '555' });
+    const { data: link, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email: check.email });
+    expect(error).toBeNull();
+    const c = anonClient();
+    const { error: otpErr } = await c.auth.verifyOtp({ type: 'email', token_hash: link.properties!.hashed_token });
+    expect(otpErr).toBeNull();
+    expect((await c.from('members').select('id')).data ?? []).toHaveLength(0);
+    expect((await c.rpc('verify_pin', { p_pin: '555' })).data.ok).toBe(true);
+    expect((await c.from('members').select('id')).data!.length).toBeGreaterThan(0);
+    // The one-time token cannot be replayed.
+    const replay = anonClient();
+    expect((await replay.auth.verifyOtp({ type: 'email', token_hash: link.properties!.hashed_token })).error).not.toBeNull();
   });
 
   it('PIN verification is bound to the session: a second password login must verify again', async () => {
@@ -102,6 +160,12 @@ describe('authentication gates', () => {
     expect(error).not.toBeNull();
     const { error: e2 } = await d.rpc('service_resolve_login', { p_identifier: 'kartik' });
     expect(e2).not.toBeNull();
+    const { error: e3 } = await d.rpc('service_pin_login', { p_identifier: 'kartik', p_pin: '111' });
+    expect(e3).not.toBeNull();
+    const { error: e4 } = await anonClient().rpc('service_pin_login', { p_identifier: 'kartik', p_pin: '111' });
+    expect(e4).not.toBeNull();
+    const { error: e5 } = await d.rpc('admin_pin_locked', { p_member: ids.Kartik });
+    expect(e5).not.toBeNull();
   });
 });
 

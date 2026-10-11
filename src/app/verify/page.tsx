@@ -12,7 +12,7 @@ export default async function VerifyPage() {
   if (!s.linked || !s.active) redirect('/login?error=inactive');
   if (s.verified) redirect('/');
   return (
-    <AuthShell step={2} title={`Hi ${s.name}, enter your PIN`} subtitle="Your 3-digit PIN is the second step of signing in.">
+    <AuthShell title={`Hi ${s.name}, enter your PIN`} subtitle="For your security, enter your 3-digit PIN again.">
       <ActionForm action={verifyPinAction} className="space-y-4">
         <div>
           <label className="label" htmlFor="pin">PIN</label>

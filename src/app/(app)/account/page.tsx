@@ -1,7 +1,5 @@
-import { z } from 'zod';
-import { createClient as createPlainClient } from '@supabase/supabase-js';
 import { requireMe } from '@/lib/session';
-import { createClient, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { friendlyError } from '@/lib/format';
 import type { ActionState } from '@/lib/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -23,26 +21,6 @@ async function changePin(_prev: ActionState, formData: FormData): Promise<Action
   return { ok: 'PIN changed.' };
 }
 
-async function changePassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  'use server';
-  await requireMe();
-  const pw = z.string().min(10).max(200).regex(/[a-zA-Z]/).regex(/\d/).safeParse(formData.get('new_password'));
-  if (!pw.success) return { error: 'New password needs 10+ characters including a letter and a digit.' };
-  if (pw.data !== formData.get('confirm_password')) return { error: 'The new passwords do not match.' };
-  const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const email = user.user?.email;
-  if (!email) return { error: 'Please sign in again.' };
-  // Re-check the current password on a throwaway client so this session is untouched.
-  const probe = createPlainClient(supabaseUrl(), supabaseAnonKey(), { auth: { persistSession: false, autoRefreshToken: false } });
-  const { error: authErr } = await probe.auth.signInWithPassword({ email, password: String(formData.get('current_password') ?? '') });
-  if (authErr) return { error: 'Current password is incorrect.' };
-  await probe.auth.signOut({ scope: 'local' });
-  const { error } = await supabase.auth.updateUser({ password: pw.data });
-  if (error) return { error: friendlyError(error.message) };
-  return { ok: 'Password changed.' };
-}
-
 export default async function Account() {
   const me = await requireMe();
   return (
@@ -58,26 +36,6 @@ export default async function Account() {
             </div>
           ))}
           <div className="sm:col-span-3"><SubmitButton>Change PIN</SubmitButton></div>
-        </ActionForm>
-      </section>
-      <section className="card mt-5 p-5">
-        <SectionTitle>Change password</SectionTitle>
-        <ActionForm action={changePassword} className="grid gap-3" resetOnSuccess>
-          <div>
-            <label className="label" htmlFor="current_password">Current password</label>
-            <input id="current_password" name="current_password" type="password" className="input" required autoComplete="current-password" />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="label" htmlFor="new_password">New password</label>
-              <input id="new_password" name="new_password" type="password" className="input" minLength={10} required autoComplete="new-password" />
-            </div>
-            <div>
-              <label className="label" htmlFor="confirm_password">Confirm new password</label>
-              <input id="confirm_password" name="confirm_password" type="password" className="input" minLength={10} required autoComplete="new-password" />
-            </div>
-          </div>
-          <div><SubmitButton>Change password</SubmitButton></div>
         </ActionForm>
       </section>
       <section className="card mt-5 p-5">

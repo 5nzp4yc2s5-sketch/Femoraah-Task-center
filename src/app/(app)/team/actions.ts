@@ -1,5 +1,6 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -22,12 +23,6 @@ const memberSchema = z.object({
 
 const loginSchema = z.object({
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{3,32}$/, 'Username: 3-32 lowercase letters, digits, dot, dash or underscore'),
-  password: z
-    .string()
-    .min(10, 'Temporary password must be at least 10 characters')
-    .max(200)
-    .regex(/[a-zA-Z]/, 'Password needs a letter')
-    .regex(/\d/, 'Password needs a digit'),
   pin: z.string().regex(/^\d{3}$/, 'PIN must be exactly 3 digits'),
 });
 
@@ -45,7 +40,8 @@ async function provisionLogin(memberId: string, input: z.infer<typeof loginSchem
   const admin = createAdminClient();
   const { data: created, error } = await admin.auth.admin.createUser({
     email: loginEmail(input.username),
-    password: input.password,
+    // Sign-in is username + PIN, so nobody ever types this. It only has to be unguessable.
+    password: randomBytes(32).toString('base64url'),
     email_confirm: true,
     app_metadata: { provisioned_by: 'opspulse-admin' },
   });
@@ -104,26 +100,13 @@ export async function createLoginAction(_prev: ActionState, formData: FormData):
   const err = await provisionLogin(id.data, login.data);
   if (err) return { error: err };
   revalidatePath('/team', 'layout');
-  return { ok: `Login created. Give ${login.data.username} their temporary password and PIN in person; they should change both from Account.` };
+  return { ok: `Login created. Give ${login.data.username} their PIN in person; they can change it from Account.` };
 }
 
 async function userIdFor(memberId: string): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.from('members').select('user_id').eq('id', memberId).maybeSingle();
   return data?.user_id ?? null;
-}
-
-export async function resetPasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const id = z.uuid().safeParse(formData.get('id'));
-  const pw = loginSchema.shape.password.safeParse(formData.get('password'));
-  if (!id.success) return { error: 'Unknown member.' };
-  if (!pw.success) return { error: pw.error.issues[0].message };
-  const userId = await userIdFor(id.data);
-  if (!userId) return { error: 'This member has no login.' };
-  const { error } = await createAdminClient().auth.admin.updateUserById(userId, { password: pw.data });
-  if (error) return { error: friendlyError(error.message) };
-  return { ok: 'Temporary password set.' };
 }
 
 export async function resetPinAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

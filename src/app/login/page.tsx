@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const s = await getSessionStatus();
   if (s.signed_in && s.linked && s.active) redirect(s.verified ? '/' : '/verify');
   return (
-    <AuthShell step={1} title="Sign in" subtitle="Use the username and password your admin gave you.">
+    <AuthShell title="Sign in" subtitle="Use the username and 3-digit PIN your admin gave you.">
       {sp.error === 'inactive' && (
         <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           This account is not active. Ask your admin if you think this is a mistake.
@@ -24,10 +24,20 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <input id="identifier" name="identifier" className="input" autoComplete="username" autoCapitalize="none" required autoFocus />
         </div>
         <div>
-          <label className="label" htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" className="input" autoComplete="current-password" required />
+          <label className="label" htmlFor="pin">PIN</label>
+          <input
+            id="pin"
+            name="pin"
+            type="password"
+            className="input text-center text-2xl tracking-[0.6em]"
+            inputMode="numeric"
+            pattern="[0-9]{3}"
+            maxLength={3}
+            autoComplete="off"
+            required
+          />
         </div>
-        <SubmitButton className="btn-primary w-full" pendingText="Signing in…">Continue</SubmitButton>
+        <SubmitButton className="btn-primary w-full" pendingText="Signing in…">Sign in</SubmitButton>
       </ActionForm>
     </AuthShell>
   );

@@ -64,7 +64,7 @@ export default async function Help() {
       </Card>
 
       <Card title="Signing in">
-        <p>Sign in with your username and password, then your 3-digit PIN. Five wrong PINs lock the account for 15 minutes; five wrong passwords do the same. Change your password and PIN from <Link href="/account" className="text-navy-700 underline">Account</Link>. Ask the admin if you are locked out or forgot either.</p>
+        <p>Sign in with your username and 3-digit PIN. Your device stays signed in and asks for the PIN again every 12 hours. Five wrong PINs in a row lock the account until the admin resets your PIN from the Team page. Change your PIN from <Link href="/account" className="text-navy-700 underline">Account</Link>, and never share it in a group chat.</p>
       </Card>
     </div>
   );

@@ -35,7 +35,7 @@ export interface Me {
   timezone: string;
 }
 
-/** Require a fully verified (password + PIN) session or redirect to the right step. */
+/** Require a fully verified (PIN-checked) session or redirect to the right step. */
 export async function requireMe(): Promise<Me> {
   const s = await getSessionStatus();
   if (!s.signed_in) redirect('/login');

@@ -14,7 +14,7 @@ A private team task command center that replaces the OpsPulse Google Sheet: Task
 - `supabase/migrations/`: schema, functions/triggers, RLS + grants, seed data from the spreadsheet. `docs/all-migrations.sql` is the same thing in one file for the SQL editor.
 - `src/proxy.ts`: refreshes the Supabase session cookie and sends signed-out visitors to /login.
 - `src/app/(app)/…`: pages. Every read and write uses the signed-in user's session, so RLS applies. The service key is used only server-side for login lockout bookkeeping, username lookup, and creating/disabling auth users after the caller is confirmed as admin.
-- Sign-in: username + password (Supabase Auth), then a 3-digit PIN checked in Postgres (`verify_pin`). A session that has not passed the PIN step reads nothing, because every policy goes through `private.me()`.
+- Sign-in: username + 3-digit PIN. The server checks the PIN in Postgres (`service_pin_login`), then starts a Supabase Auth session with a one-time magic-link token (no email is sent) and marks it verified (`verify_pin`). Auth users keep a random 32-byte password nobody knows. A session that has not passed the PIN step reads nothing, because every policy goes through `private.me()`. Devices stay signed in and re-check the PIN every 12 hours.
 
 ## Local development
 ```bash
@@ -37,8 +37,8 @@ Tests: `npm test` (database security, needs `.env.test.local` with TEST_SUPABASE
 - **Routine cycle:** Next Due = Last Done + Every N Days. Ticking again before Next Due is refused as the same cycle.
 
 ## Known limitations
-- A 3-digit PIN has 1,000 values. It is a second step after the password, with lockout after 5 tries, not strong authentication on its own; the hash would be trivially reversible offline if the database leaked. The password is the real credential.
-- The password-step lockout (5 failures per username or 20 per IP in 15 min) applies to the app's sign-in form. Someone holding the public key can call Supabase Auth directly, which only has Supabase's per-IP limits; they would still need the PIN, which is locked in the database.
+- **The 3-digit PIN is the only secret (owner's choice, 11-Oct-2026).** It has 1,000 values, so five wrong PINs in a row lock the account until an admin resets the PIN; a stranger who knows a username has a 1 in 200 chance before the lock. Usernames are first names, so treat them as known. The PIN hash would be trivially reversible offline if the database leaked.
+- One IP is throttled after 20 failed sign-ins in 15 minutes. Anyone who knows a username can lock that person out by entering wrong PINs; the admin unlocks them from the Team page.
 - Deactivation removes data access immediately and bans the auth user; an already-issued access token expires within an hour but can read nothing in the meantime.
 - Other people's changes appear on the next refresh (pages refresh every 60 s and when the tab regains focus), not instantly.
 - No notifications, no leave/holiday calendar, no file attachments. The spreadsheet's holiday rows are kept in Data Review.

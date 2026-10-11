@@ -6,7 +6,7 @@ import { activeMembers } from '@/lib/data';
 import type { TeamRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { Notice, SectionTitle } from '@/components/ui';
-import { createLoginAction, removeLoginAction, resetPasswordAction, resetPinAction, setActiveAction, updateMemberAction } from '../actions';
+import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, updateMemberAction } from '../actions';
 import { LoginFields, MemberFields } from '../fields';
 
 export const metadata = { title: 'Team member' };
@@ -25,6 +25,7 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
   const m = (team as TeamRow[] | null)?.find((r) => r.member_id === id);
   if (!m || !raw) notFound();
   const isSelf = m.member_id === me.memberId;
+  const { data: pinLocked } = m.has_login ? await supabase.rpc('admin_pin_locked', { p_member: m.member_id }) : { data: false };
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -50,8 +51,9 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
           <div className="space-y-5">
             <div>
               <p className="text-sm">Username: <strong>{m.username}</strong></p>
-              <p className="mt-1 text-xs text-slate-500">Share passwords and PINs in person. They can change both from Account after signing in.</p>
+              <p className="mt-1 text-xs text-slate-500">Share PINs in person. They can change theirs from Account after signing in.</p>
             </div>
+            {pinLocked && <Notice tone="warn">Locked after 5 wrong PINs. Set a new PIN below to unlock.</Notice>}
             <ActionForm action={resetPinAction} className="flex flex-wrap items-end gap-2" resetOnSuccess>
               <input type="hidden" name="id" value={m.member_id} />
               <div>
@@ -60,14 +62,6 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
               </div>
               <SubmitButton className="btn-secondary">Reset PIN</SubmitButton>
             </ActionForm>
-            <ActionForm action={resetPasswordAction} className="flex flex-wrap items-end gap-2" resetOnSuccess>
-              <input type="hidden" name="id" value={m.member_id} />
-              <div>
-                <label className="label" htmlFor="new-password">New temporary password</label>
-                <input id="new-password" name="password" type="password" className="input w-64" minLength={10} required autoComplete="new-password" />
-              </div>
-              <SubmitButton className="btn-secondary">Set password</SubmitButton>
-            </ActionForm>
             {!isSelf && (
               <ConfirmAction action={removeLoginAction} label="Remove login" title={`Remove ${m.name}'s login?`} body="They will no longer be able to sign in. Their member record and task history are kept." confirmLabel="Remove login" hidden={{ id: m.member_id }} />
             )}
@@ -75,7 +69,7 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
         ) : (
           <ActionForm action={createLoginAction} className="space-y-4">
             <input type="hidden" name="id" value={m.member_id} />
-            <p className="text-sm text-slate-600">Create a sign-in for {m.name}. Share the temporary password and PIN in person, not in a group chat.</p>
+            <p className="text-sm text-slate-600">Create a sign-in for {m.name}. Share the PIN in person, not in a group chat.</p>
             <LoginFields />
             <div className="flex justify-end"><SubmitButton>Create login</SubmitButton></div>
           </ActionForm>

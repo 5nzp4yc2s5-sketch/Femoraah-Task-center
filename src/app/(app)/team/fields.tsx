@@ -50,15 +50,10 @@ export function MemberFields({ m, members }: { m?: Partial<TeamRow> & { accepts_
 
 export function LoginFields({ optional = false }: { optional?: boolean }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2">
       <div>
         <label className="label" htmlFor="username">Username</label>
         <input id="username" name="username" className="input" autoComplete="off" pattern="[a-z0-9._\-]{3,32}" required={!optional} placeholder="e.g. zinia" />
-      </div>
-      <div>
-        <label className="label" htmlFor="password">Temporary password</label>
-        <input id="password" name="password" type="password" className="input" autoComplete="new-password" minLength={10} required={!optional} />
-        <p className="mt-1 text-xs text-slate-500">10+ characters with a letter and a digit.</p>
       </div>
       <div>
         <label className="label" htmlFor="pin">3-digit PIN</label>
