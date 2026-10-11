@@ -3,45 +3,65 @@ import { notFound } from 'next/navigation';
 import { requireMe } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers } from '@/lib/data';
-import { fmtDate } from '@/lib/format';
-import type { BacklogRow } from '@/lib/types';
+import { fmtDate, friendlyError } from '@/lib/format';
+import type { BacklogRow, TeamRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
-import { BacklogStatusBadge, PriorityBadge } from '@/components/badges';
+import { BacklogStatusBadge, CapacityBadge, PriorityBadge } from '@/components/badges';
 import { LocalTime } from '@/components/local-time';
 import { Notice, SectionTitle } from '@/components/ui';
-import { approveBacklogAction, refreshSuggestionAction, rejectBacklogAction, updateBacklogAction } from '../actions';
+import { convertBacklogAction, refreshSuggestionAction, rejectBacklogAction, updateBacklogAction } from '../actions';
+import { ApproveForm } from '../approve-form';
 import { BacklogFields } from '../fields';
 
 export const metadata = { title: 'Backlog item' };
 
-export default async function BacklogDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+const yesNo = (v: boolean, yes: string, no: string, yesClass: string) => (v ? <span className={yesClass}>{yes}</span> : <span className="text-slate-500">{no}</span>);
+
+export default async function BacklogDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; approved?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const me = await requireMe();
   const supabase = await createClient();
-  const { data } = await supabase.from('backlog_board').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('backlog_board').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    return (
+      <div className="max-w-5xl">
+        <Link href="/backlog" className="text-sm text-navy-700 hover:underline">← Pending Backlog</Link>
+        <div className="mt-3"><Notice tone="error">Could not load this backlog item: {friendlyError(error.message)}</Notice></div>
+      </div>
+    );
+  }
   if (!data) notFound();
   const b = data as BacklogRow;
-  const members = await activeMembers();
-  const open = b.status === 'Open';
-  const canEdit = open && (me.isManager || me.memberId === b.requested_by);
+  const pending = b.status === 'Pending';
+  const approved = b.status === 'Approved';
+  const converted = b.status === 'Converted to Task';
+  const dismissed = b.status === 'Dismissed';
+  const canEdit = pending && (me.isManager || me.memberId === b.requested_by);
+
+  const [members, { data: teamData }] = await Promise.all([me.isManager && pending ? activeMembers() : Promise.resolve([]), supabase.rpc('team_overview')]);
+  const team = new Map(((teamData ?? []) as TeamRow[]).map((m) => [m.member_id, m]));
+  const suggested = b.suggested_owner_id ? team.get(b.suggested_owner_id) : undefined;
+  const assigned = b.final_owner_id ? team.get(b.final_owner_id) : undefined;
+  const candidates = b.suggestion_candidates ?? [];
 
   return (
     <div className="max-w-5xl">
       {sp.created && <Notice>Added to the backlog. {b.suggested_owner_name ? `Suggested owner: ${b.suggested_owner_name}.` : ''} A manager will review it.</Notice>}
+      {sp.approved && approved && <Notice>Approved and assigned to {b.final_owner_name}. Use &quot;Convert to task&quot; when the work should start.</Notice>}
       <Link href="/backlog" className="text-sm text-navy-700 hover:underline">← Pending Backlog</Link>
       <div className="mb-5 mt-2">
         <div className="font-mono text-xs text-slate-500">{b.backlog_code}</div>
         <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{b.title}</h1>
         <div className="mt-2 flex flex-wrap gap-2">
-          <BacklogStatusBadge status={b.status} approval={b.approval} />
+          <BacklogStatusBadge status={b.status} />
           <PriorityBadge priority={b.priority} />
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
+        <div className="min-w-0 space-y-5 lg:col-span-2">
           <dl className="card grid grid-cols-2 gap-x-4 gap-y-3 p-5 text-sm sm:grid-cols-3">
             <div><dt className="label">Requested By</dt><dd>{b.requested_by_name}</dd></div>
             <div><dt className="label">Date Added</dt><dd>{fmtDate(b.date_added)}</dd></div>
@@ -51,48 +71,85 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
           </dl>
 
           <section className="card p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <h2 className="font-semibold text-navy-900">Suggested Owner: {b.suggested_owner_name ?? 'none'}</h2>
+                {suggested && (
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span>Now:</span>
+                    <CapacityBadge status={suggested.capacity_status} />
+                    {suggested.on_leave && suggested.leave_until && <span>until {fmtDate(suggested.leave_until)}</span>}
+                    <span className="tabular-nums">{suggested.open_tasks}/{suggested.max_open_tasks} open</span>
+                  </div>
+                )}
+                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">Suggested by rules: skills, workload, overdue, blocked, availability</p>
                 <p className="mt-1 text-sm text-slate-700">{b.suggestion_reason ?? 'No suggestion yet.'}</p>
                 {b.suggested_at && <p className="mt-1 text-xs text-slate-500">Calculated <LocalTime iso={b.suggested_at} /></p>}
               </div>
-              {open && (
+              {pending && (
                 <ActionForm action={refreshSuggestionAction}>
                   <input type="hidden" name="id" value={b.id} />
                   <SubmitButton className="btn-secondary whitespace-nowrap" pendingText="…">Recalculate</SubmitButton>
                 </ActionForm>
               )}
             </div>
-            {b.suggestion_candidates.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <table className="sheet">
-                  <thead>
-                    <tr>
-                      <th>Candidate</th>
-                      <th className="text-right">Score</th>
-                      <th className="text-right">Skill match</th>
-                      <th>Matched skills</th>
-                      <th className="text-right">Open / max</th>
-                      <th className="text-right">Overdue</th>
-                      <th className="text-right">Blocked</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {b.suggestion_candidates.map((c) => (
-                      <tr key={c.member_id} className={c.has_capacity ? '' : 'text-slate-400'}>
-                        <td className="whitespace-nowrap font-medium">{c.name}{!c.has_capacity && ' (at capacity)'}</td>
-                        <td className="text-right tabular-nums">{Number(c.score).toFixed(2)}</td>
-                        <td className="text-right tabular-nums">{Math.round(c.skill * 100)}%</td>
-                        <td className="text-xs">{c.matched.join(', ') || '—'}</td>
-                        <td className="text-right tabular-nums">{c.open}/{c.max}</td>
-                        <td className="text-right tabular-nums">{c.overdue}</td>
-                        <td className="text-right tabular-nums">{c.blocked}</td>
+            {candidates.length > 0 && (
+              <div className="mt-4">
+                {/* Phones: one card per candidate */}
+                <ul className="space-y-2 md:hidden">
+                  {candidates.map((c) => (
+                    <li key={c.member_id} className={`rounded-lg border border-line p-3 text-sm ${c.eligible ? '' : 'text-slate-500'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{c.name}</span>
+                        {yesNo(c.eligible, 'Eligible', 'Not eligible', 'text-xs font-semibold text-green-700')}
+                      </div>
+                      <div className="mt-1 text-xs">
+                        Skill match {Math.round(c.skill * 100)}% · Open {c.open}/{c.max} · Overdue {c.overdue} · Blocked {c.blocked} · Score {Number(c.score).toFixed(2)}
+                      </div>
+                      {c.matched.length > 0 && <div className="mt-0.5 text-xs">Matched: {c.matched.join(', ')}</div>}
+                      {c.on_leave && <div className="mt-0.5 text-xs font-medium text-violet-800">On leave today</div>}
+                    </li>
+                  ))}
+                </ul>
+                {/* Tablet / desktop: sheet */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="sheet">
+                    <thead>
+                      <tr>
+                        <th>Candidate</th>
+                        <th className="text-right">Score</th>
+                        <th className="text-right">Skill match</th>
+                        <th>Matched skills</th>
+                        <th className="text-right">Open / max</th>
+                        <th className="text-right">Overdue</th>
+                        <th className="text-right">Blocked</th>
+                        <th>On leave</th>
+                        <th>Eligible</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="mt-2 text-xs text-slate-500">Score = 70% skill match + 30% spare capacity (open + overdue + half of blocked, against Max Open Tasks). People at capacity are not suggested.</p>
+                    </thead>
+                    <tbody>
+                      {candidates.map((c) => (
+                        <tr key={c.member_id} className={c.eligible ? '' : 'text-slate-400'}>
+                          <td className="whitespace-nowrap font-medium">
+                            {c.name}
+                            {!c.has_capacity && ' (at capacity)'}
+                          </td>
+                          <td className="text-right tabular-nums">{Number(c.score).toFixed(2)}</td>
+                          <td className="text-right tabular-nums">{Math.round(c.skill * 100)}%</td>
+                          <td className="text-xs">{c.matched.join(', ') || '—'}</td>
+                          <td className="text-right tabular-nums">{c.open}/{c.max}</td>
+                          <td className="text-right tabular-nums">{c.overdue}</td>
+                          <td className="text-right tabular-nums">{c.blocked}</td>
+                          <td>{yesNo(c.on_leave, 'On leave', 'No', 'text-xs font-semibold text-violet-800')}</td>
+                          <td>{yesNo(c.eligible, 'Yes', 'No', 'text-xs font-semibold text-green-700')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Score = 70% skill match + 30% spare capacity (open + overdue + half of blocked, against Max Open Tasks). Only eligible people are suggested: not on leave today and below their open-task limit. Figures are from when the suggestion was calculated.
+                </p>
               </div>
             )}
           </section>
@@ -110,47 +167,84 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
         </div>
 
         <aside className="space-y-5">
-          {open && me.isManager && (
+          {pending && me.isManager && (
             <section className="card border-navy-600/40 p-5">
               <h2 className="font-semibold text-navy-900">Manager decision</h2>
-              <p className="mb-3 mt-1 text-sm text-slate-600">Approving creates the Task Board entry and marks this row Assigned.</p>
-              <ActionForm action={approveBacklogAction} className="space-y-3">
-                <input type="hidden" name="id" value={b.id} />
-                <div>
-                  <label className="label" htmlFor="owner_id">Assign to</label>
-                  <select id="owner_id" name="owner_id" className="input" defaultValue={b.suggested_owner_id ?? ''} required>
-                    <option value="" disabled>Choose…</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}{m.id === b.suggested_owner_id ? ' (suggested)' : ''}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label" htmlFor="note">Decision note</label>
-                  <input id="note" name="note" className="input" maxLength={1000} placeholder="Optional, e.g. why you overrode the suggestion" />
-                </div>
-                <SubmitButton className="btn-primary w-full" pendingText="Approving…">Approve and assign</SubmitButton>
-              </ActionForm>
+              <p className="mb-3 mt-1 text-sm text-slate-600">&quot;Approve and create task&quot; puts it on the Task Board as To Do. &quot;Approve only&quot; records who will take it; create the task later.</p>
+              <ApproveForm
+                itemId={b.id}
+                suggestedId={b.suggested_owner_id}
+                options={members.map((m) => {
+                  const t = team.get(m.id);
+                  return { id: m.id, name: m.name, onLeave: Boolean(t?.on_leave), leaveUntil: t?.leave_until ?? null };
+                })}
+              />
               <div className="mt-3">
-                <ConfirmAction action={rejectBacklogAction} label="Reject" title="Reject this backlog item?" body="It will be marked Rejected and kept for the record. No task is created." confirmLabel="Reject" className="btn-secondary w-full" hidden={{ id: b.id }} withNote />
+                <ConfirmAction action={rejectBacklogAction} label="Dismiss" title="Dismiss this backlog item?" body="It will be marked Dismissed and kept for the record. No task is created. Add a reason so the requester knows why." confirmLabel="Dismiss" className="btn-secondary w-full" hidden={{ id: b.id }} withNote />
               </div>
             </section>
           )}
-          {open && !me.isManager && <Notice>Waiting for a manager to approve an owner.</Notice>}
-          {!open && (
+          {pending && !me.isManager && <Notice>Waiting for a manager to approve an owner.</Notice>}
+
+          {approved && (
+            <section className={`card p-5 text-sm ${me.isManager ? 'border-navy-600/40' : ''}`}>
+              <h2 className="font-semibold text-navy-900">Approved, not yet a task</h2>
+              <p className="mt-2">
+                Assigned to <strong>{b.final_owner_name}</strong>
+                {b.overrode_suggestion ? ` (overrode suggestion: ${b.suggested_owner_name ?? 'none'})` : ' (as suggested)'}.
+              </p>
+              {assigned && (
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  <span>Now:</span>
+                  <CapacityBadge status={assigned.capacity_status} />
+                  {assigned.on_leave && assigned.leave_until && <span>until {fmtDate(assigned.leave_until)}</span>}
+                </div>
+              )}
+              {b.override_leave && <p className="mt-1 text-xs text-violet-800">Approved while {b.final_owner_name} was on leave.</p>}
+              <p className="mt-1 text-slate-600">Approved by {b.decided_by_name ?? '—'} · <LocalTime iso={b.decided_at} /></p>
+              {b.decision_note && <p className="mt-1 text-slate-600">Note: {b.decision_note}</p>}
+              {me.isManager ? (
+                <div className="mt-4 space-y-3">
+                  <ActionForm action={convertBacklogAction}>
+                    <input type="hidden" name="id" value={b.id} />
+                    <SubmitButton className="btn-primary w-full" pendingText="Creating task…">Convert to task</SubmitButton>
+                  </ActionForm>
+                  <ConfirmAction action={rejectBacklogAction} label="Dismiss" title="Dismiss this approved item?" body="It will be marked Dismissed and kept for the record. No task is created." confirmLabel="Dismiss" className="btn-secondary w-full" hidden={{ id: b.id }} withNote />
+                </div>
+              ) : (
+                <p className="mt-3 text-slate-600">A manager will convert it to a task.</p>
+              )}
+            </section>
+          )}
+
+          {converted && (
             <section className="card p-5 text-sm">
               <SectionTitle>Decision</SectionTitle>
               <p>
-                <strong>{b.approval === 'Yes' ? 'Approved' : 'Rejected'}</strong> by {b.decided_by_name} · <LocalTime iso={b.decided_at} />
+                Assigned to <strong>{b.final_owner_name}</strong>
+                {b.overrode_suggestion ? ` (overrode suggestion: ${b.suggested_owner_name ?? 'none'})` : ' (as suggested)'}.
               </p>
-              {b.status === 'Assigned' && (
-                <p className="mt-1">
-                  Assigned to <strong>{b.final_owner_name}</strong>
-                  {b.overrode_suggestion ? ` (overrode suggestion: ${b.suggested_owner_name ?? 'none'})` : ' (as suggested)'}.{' '}
-                  {b.task_id && <Link href={`/tasks/${b.task_id}`} className="text-navy-700 underline">Open task</Link>}
-                </p>
-              )}
+              {b.override_leave && <p className="mt-1 text-xs text-violet-800">Assigned while {b.final_owner_name} was on leave.</p>}
+              <p className="mt-1">
+                <strong>Approved</strong> by {b.decided_by_name ?? '—'} · <LocalTime iso={b.decided_at} />
+              </p>
+              <p className="mt-1">
+                <strong>Converted to task</strong> by {b.converted_by_name ?? '—'} · <LocalTime iso={b.converted_at} />
+              </p>
               {b.decision_note && <p className="mt-1 text-slate-600">Note: {b.decision_note}</p>}
+              {b.task_id && (
+                <Link href={`/tasks/${b.task_id}`} className="btn-secondary mt-4 w-full">Open task</Link>
+              )}
+            </section>
+          )}
+
+          {dismissed && (
+            <section className="card p-5 text-sm">
+              <SectionTitle>Decision</SectionTitle>
+              <p>
+                <strong>Dismissed</strong> by {b.decided_by_name ?? '—'} · <LocalTime iso={b.decided_at} />
+              </p>
+              <p className="mt-1 text-slate-600">Reason: {b.decision_note || 'none given'}</p>
             </section>
           )}
         </aside>

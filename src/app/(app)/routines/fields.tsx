@@ -4,9 +4,19 @@ import { useState } from 'react';
 import type { MemberOption, RoutineRow } from '@/lib/types';
 import { FREQUENCIES } from '@/lib/types';
 
+const FIXED_DAYS: Record<string, number> = { Daily: 1, Weekly: 7, Monthly: 30 };
+
 export function RoutineFields({ routine, members }: { routine?: RoutineRow; members: MemberOption[] }) {
   const [freq, setFreq] = useState<string>(routine?.frequency ?? 'Daily');
-  const fixed = freq === 'Daily' ? 1 : freq === 'Weekly' ? 7 : null;
+  const [owner, setOwner] = useState<string>(routine?.owner_id ?? '');
+  const [backup, setBackup] = useState<string>(routine?.backup_member_id ?? '');
+  const fixed = FIXED_DAYS[freq] ?? null;
+  // Keep a current backup who has since left visible, so saving other fields does not silently clear it.
+  const backupOptions =
+    routine?.backup_member_id && !members.some((m) => m.id === routine.backup_member_id)
+      ? [...members, { id: routine.backup_member_id, name: `${routine.backup_name ?? 'Former member'} (inactive)` }]
+      : members;
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -14,13 +24,31 @@ export function RoutineFields({ routine, members }: { routine?: RoutineRow; memb
         <input id="title" name="title" className="input" defaultValue={routine?.title} required maxLength={200} />
       </div>
       <div>
-        <label className="label" htmlFor="owner_id">Owner</label>
-        <select id="owner_id" name="owner_id" className="input" defaultValue={routine?.owner_id ?? ''} required>
+        <label className="label" htmlFor="owner_id">Assigned to</label>
+        <select
+          id="owner_id"
+          name="owner_id"
+          className="input"
+          value={owner}
+          onChange={(e) => {
+            setOwner(e.target.value);
+            if (e.target.value === backup) setBackup('');
+          }}
+          required
+        >
           <option value="" disabled>Choose…</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="label" htmlFor="backup_member_id">Backup (optional)</label>
+        <select id="backup_member_id" name="backup_member_id" className="input" value={backup} onChange={(e) => setBackup(e.target.value)}>
+          <option value="">No backup</option>
+          {backupOptions.filter((m) => m.id !== owner).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <p className="mt-1 text-xs text-slate-500">Covers it only while the assigned person is on leave. The routine stays assigned to them.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:max-w-md">
         <div>
           <label className="label" htmlFor="frequency">Frequency</label>
           <select id="frequency" name="frequency" className="input" value={freq} onChange={(e) => setFreq(e.target.value)}>
@@ -36,14 +64,16 @@ export function RoutineFields({ routine, members }: { routine?: RoutineRow; memb
               id="every_n_days"
               name="every_n_days"
               type="number"
+              inputMode="numeric"
               className="input"
-              min={freq === 'Monthly' ? 28 : 1}
-              max={freq === 'Monthly' ? 31 : 366}
-              defaultValue={routine && routine.frequency === freq ? routine.every_n_days : freq === 'Monthly' ? 30 : 3}
+              min={1}
+              max={366}
+              defaultValue={routine && routine.frequency === 'Custom' ? routine.every_n_days : 3}
               required
             />
           )}
         </div>
+        <p className="col-span-2 -mt-1 text-xs text-slate-500">Daily = 1 day, Weekly = 7 days, Monthly = 30 days. Choose Custom for any other number of days. Next Due = Last Done + Every N Days.</p>
       </div>
       <div className="sm:col-span-2">
         <label className="label" htmlFor="notes">Notes</label>

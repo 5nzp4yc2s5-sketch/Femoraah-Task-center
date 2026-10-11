@@ -22,7 +22,7 @@ export function friendlyError(message: string | undefined | null): string {
   if (/violates check constraint.*percent/i.test(message)) return '% Complete must be between 0 and 100.';
   if (/due_date.*start_date|tasks_check/i.test(message)) return 'Due date cannot be before the start date.';
   if (/routines_check/i.test(message)) return 'Every N Days must match the frequency (Daily 1, Weekly 7, Monthly 30).';
-  if (/routines_backup_not_owner/i.test(message)) return 'The backup must be someone other than the owner.';
+  if (/routines_backup_not_owner/i.test(message)) return 'The backup must be someone other than the person it is assigned to.';
   if (/tasks_blocker_required/i.test(message)) return 'A blocked task needs a blocker reason.';
   if (/attendance_one_pending_correction/i.test(message)) return 'You already have a pending correction request for that day.';
   if (/holidays_holiday_date_key|duplicate key.*holiday_date/i.test(message)) return 'There is already a holiday on that date.';

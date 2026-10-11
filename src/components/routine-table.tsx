@@ -1,25 +1,78 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { RoutineRow } from '@/lib/types';
 import { fmtDate } from '@/lib/format';
 import { RoutineStatusBadge } from './badges';
 import { EmptyState } from './ui';
+import { LocalTime } from './local-time';
 import { MarkDone } from './mark-done';
 
-export function RoutineTable({ rows, canComplete, today, showOwner = true }: { rows: RoutineRow[]; canComplete: (r: RoutineRow) => boolean; today: string; showOwner?: boolean }) {
-  if (rows.length === 0) return <EmptyState title="No routine tasks" body="Recurring work assigned to you will appear here." />;
+const rowTone: Record<string, string> = {
+  Overdue: 'bg-red-50/70',
+  'Due Today': 'bg-amber-50/70',
+  OK: 'bg-done/40',
+};
+
+/** "Zinia covering while Dev is on leave", or a note that nobody is covering. Ownership never changes. */
+export function CoverNote({ r, viewerId }: { r: RoutineRow; viewerId?: string }) {
+  if (!r.owner_on_leave || !r.is_active) return null;
+  if (r.covered_by_name) {
+    return (
+      <div className="mt-0.5 text-xs font-medium text-violet-800">
+        {r.covered_by_name}
+        {viewerId && r.covered_by_id === viewerId ? ' (you)' : ''} covering while {r.owner_name} is on leave
+      </div>
+    );
+  }
+  return <div className="mt-0.5 text-xs font-medium text-violet-800">{r.owner_name} is on leave today · no backup set</div>;
+}
+
+/** Tells a non-owner why they can see this routine. */
+function ViewerTag({ r, viewerId }: { r: RoutineRow; viewerId?: string }) {
+  if (!viewerId || r.owner_id === viewerId || r.covered_by_id === viewerId) return null;
+  if (r.backup_member_id === viewerId) return <div className="mt-0.5 text-xs text-slate-500">You are the backup</div>;
+  return null;
+}
+
+export function RoutineTable({
+  rows,
+  canComplete,
+  today,
+  showOwner = true,
+  viewerId,
+  empty,
+}: {
+  rows: RoutineRow[];
+  canComplete: (r: RoutineRow) => boolean;
+  today: string;
+  showOwner?: boolean;
+  /** The signed-in member, to label routines they back up or cover. */
+  viewerId?: string;
+  empty?: { title: string; body?: string; action?: ReactNode };
+}) {
+  if (rows.length === 0) {
+    return <EmptyState title={empty?.title ?? 'No routine tasks'} body={empty ? empty.body : 'Recurring work assigned to you will appear here.'} action={empty?.action} />;
+  }
   return (
     <>
       <ul className="space-y-2 md:hidden">
         {rows.map((r) => (
           <li key={r.id} className="card p-3">
             <div className="flex items-start justify-between gap-2">
-              <Link href={`/routines/${r.id}`} className="font-medium text-navy-900 hover:underline">{r.title}</Link>
+              <div className="min-w-0">
+                <div className="text-xs text-slate-500">{r.routine_code}</div>
+                <Link href={`/routines/${r.id}`} className="font-medium text-navy-900 hover:underline">{r.title}</Link>
+              </div>
               <RoutineStatusBadge status={r.status} />
             </div>
+            <CoverNote r={r} viewerId={viewerId} />
+            <ViewerTag r={r} viewerId={viewerId} />
             <div className="mt-1 text-xs text-slate-600">
-              {showOwner && <>{r.owner_name} · </>}
+              {showOwner && <>Assigned to {r.owner_name} · </>}
+              {r.backup_name && <>Backup {r.backup_name} · </>}
               {r.frequency} (every {r.every_n_days}d) · Last {fmtDate(r.last_done)} · Next {fmtDate(r.next_due)}
             </div>
+            {r.notes && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{r.notes}</p>}
             {canComplete(r) && r.is_active && (
               <div className="mt-2">
                 <MarkDone routineId={r.id} today={today} doneThisCycle={r.status === 'OK'} />
@@ -32,8 +85,10 @@ export function RoutineTable({ rows, canComplete, today, showOwner = true }: { r
         <table className="sheet">
           <thead>
             <tr>
+              <th>Routine ID</th>
               <th>Routine Task</th>
-              {showOwner && <th>Owner</th>}
+              {showOwner && <th>Assigned to</th>}
+              <th>Backup</th>
               <th>Frequency</th>
               <th>Every N Days</th>
               <th>Last Done</th>
@@ -45,14 +100,27 @@ export function RoutineTable({ rows, canComplete, today, showOwner = true }: { r
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className={r.status === 'Overdue' ? 'bg-red-50/70' : r.status === 'Due today' ? 'bg-amber-50/70' : r.status === 'OK' ? 'bg-done/40' : ''}>
+              <tr key={r.id} className={rowTone[r.status] ?? ''}>
+                <td className="whitespace-nowrap font-mono text-xs">
+                  <Link href={`/routines/${r.id}`} className="hover:underline">{r.routine_code}</Link>
+                </td>
                 <td className="min-w-56 font-medium text-navy-900">
                   <Link href={`/routines/${r.id}`} className="hover:underline">{r.title}</Link>
+                  <CoverNote r={r} viewerId={viewerId} />
+                  <ViewerTag r={r} viewerId={viewerId} />
                 </td>
                 {showOwner && <td className="whitespace-nowrap">{r.owner_name}</td>}
+                <td className="whitespace-nowrap">{r.backup_name ?? <span className="text-slate-400">—</span>}</td>
                 <td>{r.frequency}</td>
                 <td className="tabular-nums">{r.every_n_days}</td>
-                <td className="whitespace-nowrap tabular-nums">{fmtDate(r.last_done)}</td>
+                <td className="whitespace-nowrap tabular-nums">
+                  {fmtDate(r.last_done)}
+                  {r.last_completed_at && (
+                    <div className="text-[11px] text-slate-500" title="When it was ticked off">
+                      <LocalTime iso={r.last_completed_at} />
+                    </div>
+                  )}
+                </td>
                 <td className="whitespace-nowrap tabular-nums">{fmtDate(r.next_due)}</td>
                 <td><RoutineStatusBadge status={r.status} /></td>
                 <td className="max-w-56 text-slate-600"><span className="line-clamp-2">{r.notes || '—'}</span></td>
