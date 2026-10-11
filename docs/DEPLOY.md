@@ -40,16 +40,11 @@ Both refuse to run once an admin login exists.
 
 ## 3. GitHub
 
-Create an **empty private** repository (e.g. `opspulse-workspace`) and push this folder:
-```bash
-git remote add origin https://github.com/<you>/opspulse-workspace.git
-git push -u origin main
-```
-`.env*` files are git-ignored; only `.env.example` (placeholders) is committed.
+The code lives in https://github.com/5nzp4yc2s5-sketch/Femoraah-Task-center (branch `main`). `.env*` files are git-ignored; only `.env.example` (placeholders) is committed. Keep the repository private.
 
 ## 4. Vercel
 
-1. vercel.com → **Add New → Project** → import the GitHub repo. Framework: Next.js (auto-detected). No build settings to change.
+1. vercel.com → **Add New → Project** → import `Femoraah-Task-center`. Framework: Next.js (auto-detected). No build settings to change.
 2. **Environment Variables** (Production and Preview):
    - `NEXT_PUBLIC_SUPABASE_URL` = Project URL
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon / publishable key
