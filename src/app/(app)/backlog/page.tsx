@@ -94,7 +94,7 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
         title="Pending Backlog"
         subtitle={
           me.isManager
-            ? 'Review the suggested owner, then approve to move the task to the Task Board. Suggestions are made by rules: skills, workload, overdue, blocked and availability.'
+            ? 'Review the suggested assignee, then approve to move the task to the Task Board. Suggestions are made by rules: skills, workload, overdue, blocked and availability.'
             : 'Unassigned work. A manager approves who takes it. Suggestions are made by rules: skills, workload, overdue, blocked and availability.'
         }
         actions={<Link href="/backlog/new" className="btn-primary">Add to backlog</Link>}
@@ -177,7 +177,7 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
                   <th>Due Date</th>
                   <th>Requested By</th>
                   <th>Date Added</th>
-                  <th>Suggested Owner</th>
+                  <th>Suggested Assignee</th>
                   <th>Availability</th>
                   <th>Why (suggested by rules)</th>
                   <th>Approved?</th>

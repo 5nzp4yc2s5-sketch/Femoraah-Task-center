@@ -73,7 +73,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
           <section className="card p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h2 className="font-semibold text-navy-900">Suggested Owner: {b.suggested_owner_name ?? 'none'}</h2>
+                <h2 className="font-semibold text-navy-900">Suggested assignee: {b.suggested_owner_name ?? 'none'}</h2>
                 {suggested && (
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                     <span>Now:</span>
@@ -184,7 +184,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
               </div>
             </section>
           )}
-          {pending && !me.isManager && <Notice>Waiting for a manager to approve an owner.</Notice>}
+          {pending && !me.isManager && <Notice>Waiting for a manager to approve who takes it.</Notice>}
 
           {approved && (
             <section className={`card p-5 text-sm ${me.isManager ? 'border-navy-600/40' : ''}`}>

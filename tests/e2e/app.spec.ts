@@ -129,7 +129,7 @@ test('Zinia cannot open Shruti\'s task by URL and cannot see the manager dashboa
   await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toHaveCount(0);
 });
 
-test('Shruti adds unassigned work to the backlog and gets a suggested owner', async ({ browser }) => {
+test('Shruti adds unassigned work to the backlog and gets a rule-based suggestion', async ({ browser }) => {
   const page = await as(browser, PEOPLE.Shruti);
   await page.goto('/backlog/new');
   await page.getByLabel('Task', { exact: true }).fill('Pack and dispatch the festive bulk order');
@@ -137,26 +137,32 @@ test('Shruti adds unassigned work to the backlog and gets a suggested owner', as
   await page.getByLabel('Priority').selectOption('High');
   await page.getByLabel('Due Date').fill(isoIn(4));
   await page.getByRole('button', { name: 'Submit to backlog' }).click();
-  await expect(page.getByRole('heading', { name: /Suggested Owner: Sanket/ })).toBeVisible();
-  await expect(page.getByText('Waiting for a manager to approve an owner.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Approve and assign' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /Suggested assignee: Sanket/ })).toBeVisible();
+  await expect(page.getByText(/Alternatives:/)).toBeVisible();
+  await expect(page.getByText('Waiting for a manager to approve who takes it.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve and create task' })).toHaveCount(0);
+  await expect(page.getByText(/^BCK-1\d\d$/).first()).toBeVisible();
   backlogUrl = new URL(page.url()).pathname;
 });
 
-test('manager approves with an override; the backlog row is kept as Assigned', async ({ browser }) => {
+test('manager approves with an override; the backlog row is kept as Converted to Task', async ({ browser }) => {
   const page = await as(browser, ADMIN);
   await page.goto(backlogUrl);
   await page.screenshot({ path: `${SHOTS}/04-backlog-approval.png`, fullPage: true });
   await page.getByLabel('Assign to').selectOption({ label: 'Dev' });
   await page.getByLabel('Decision note').fill('Sanket is on dispatch this week');
-  await page.getByRole('button', { name: 'Approve and assign' }).click();
+  await page.getByRole('button', { name: 'Approve only' }).click();
+  await expect(page.getByRole('button', { name: 'Convert to task' })).toBeVisible();
+  await page.getByRole('button', { name: 'Convert to task' }).click();
   await page.waitForURL(/\/tasks\/[0-9a-f-]+\?created=1/);
   await expect(page.getByText('Task created and assigned to Dev.')).toBeVisible();
+  await expect(page.getByText('To Do').first()).toBeVisible();
   await page.goto(backlogUrl);
   await expect(page.getByText(/overrode suggestion: Sanket/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Approve and assign' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Approve and create task' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Convert to task' })).toHaveCount(0);
   await page.goto('/backlog?show=all');
-  await expect(page.getByRole('cell', { name: 'Assigned' }).first()).toBeVisible();
+  await expect(page.getByText('Converted to Task').filter({ visible: true }).first()).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/05-backlog.png`, fullPage: true });
 });
 
