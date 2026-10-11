@@ -9,7 +9,7 @@ import { TaskTable } from '@/components/task-table';
 
 export const metadata = { title: 'Task Board' };
 
-type SP = { q?: string; owner?: string; delegated?: string; priority?: string; status?: string; flag?: string; due?: string; from?: string; to?: string; scope?: string; sort?: string; done?: string; archived?: string; stale?: string; flagged?: string };
+type SP = { q?: string; owner?: string; delegated?: string; priority?: string; status?: string; flag?: string; due?: string; from?: string; to?: string; scope?: string; sort?: string; done?: string; archived?: string; stale?: string; flagged?: string; completed?: string };
 
 const UUID = /^[0-9a-f-]{36}$/;
 
@@ -39,6 +39,8 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
   if (isIsoDate(sp.to)) q = q.lte('due_date', sp.to);
   if (sp.stale === '1') q = q.eq('is_stale', true);
   if (sp.flagged === '1') q = q.eq('is_flagged', true);
+  // "Done in the last 7 days", matching the manager dashboard figure.
+  if (sp.completed === '7') q = q.eq('status', 'Done').gte('completed_at', new Date(Date.now() - 7 * 86_400_000).toISOString());
   const idMatch = term.match(/^(?:tsk[-\s]?)?0*(\d{1,6})$/i);
   if (idMatch) q = q.or(`task_no.eq.${Number(idMatch[1])},title.ilike.%${term}%`);
   else if (term) q = q.or(`title.ilike.%${term}%,details.ilike.%${term}%,progress_note.ilike.%${term}%,blocker_reason.ilike.%${term}%`);
@@ -47,7 +49,7 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
   const rows = sortTasks((data ?? []) as TaskRow[], sp.sort);
 
   const hasFilters = Boolean(
-    sp.q || sp.owner || sp.delegated || sp.priority || sp.status || sp.flag || sp.due || sp.from || sp.to || sp.done || sp.archived || sp.stale || sp.flagged || (sp.scope && sp.scope !== 'all'),
+    sp.q || sp.owner || sp.delegated || sp.priority || sp.status || sp.flag || sp.due || sp.from || sp.to || sp.done || sp.archived || sp.stale || sp.flagged || sp.completed || (sp.scope && sp.scope !== 'all'),
   );
   const tab = (key: string, label: string) => (
     <Link
@@ -129,6 +131,7 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
             <input type="checkbox" name="archived" value="1" defaultChecked={sp.archived === '1'} /> Archived only
           </label>
           {sp.stale && <input type="hidden" name="stale" value="1" />}
+          {sp.completed && <input type="hidden" name="completed" value={sp.completed} />}
           <div className="ml-auto flex gap-2">
             {hasFilters && <Link href="/tasks" className="btn-ghost">Clear</Link>}
             <button className="btn-secondary" type="submit">Apply</button>

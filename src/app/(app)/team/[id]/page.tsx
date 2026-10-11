@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
-import { activeMembers } from '@/lib/data';
+import { fmtDate, friendlyError } from '@/lib/format';
 import type { TeamRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
-import { Notice, SectionTitle } from '@/components/ui';
+import { Notice, SectionTitle, StatCard } from '@/components/ui';
+import { Avatar, CapacityBadge } from '@/components/badges';
 import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, updateMemberAction } from '../actions';
 import { LoginFields, MemberFields } from '../fields';
 
@@ -17,11 +18,18 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const me = await requireAdmin();
   const supabase = await createClient();
-  const [{ data: team }, { data: raw }, members] = await Promise.all([
+  const [{ data: team, error }, { data: raw }] = await Promise.all([
     supabase.rpc('team_overview'),
     supabase.from('members').select('accepts_unmatched').eq('id', id).maybeSingle(),
-    activeMembers(),
   ]);
+  if (error) {
+    return (
+      <div className="max-w-3xl space-y-6">
+        <Link href="/team" className="text-sm text-navy-700 hover:underline">← Team</Link>
+        <Notice tone="error">Could not load this member: {friendlyError(error.message)}</Notice>
+      </div>
+    );
+  }
   const m = (team as TeamRow[] | null)?.find((r) => r.member_id === id);
   if (!m || !raw) notFound();
   const isSelf = m.member_id === me.memberId;
@@ -32,16 +40,35 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
       <Link href="/team" className="text-sm text-navy-700 hover:underline">← Team</Link>
       {sp.created && <Notice>Member added.</Notice>}
       {sp.loginError && <Notice tone="error">Member added, but the login could not be created: {sp.loginError}</Notice>}
-      <div>
-        <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{m.name}</h1>
-        <p className="text-sm text-slate-600">
-          {m.open_tasks}/{m.max_open_tasks} open · {m.overdue} overdue · {m.blocked} blocked · {m.is_active ? 'Active' : 'Deactivated'}
-        </p>
+      <div className="flex items-start gap-3">
+        <Avatar name={m.name} />
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{m.name}</h1>
+          <p className="text-sm text-slate-600">
+            {m.role_title && <>{m.role_title} · </>}
+            {m.open_tasks}/{m.max_open_tasks} open · {m.overdue} overdue · {m.blocked} blocked ·{' '}
+            {!m.is_active ? 'Deactivated' : m.on_leave ? `On Leave${m.leave_until ? ` until ${fmtDate(m.leave_until)}` : ''}` : 'Active'}
+          </p>
+          <div className="mt-1.5"><CapacityBadge status={m.capacity_status} /></div>
+        </div>
       </div>
+
+      <section>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Open tasks" value={m.open_tasks} hint={`Max ${m.max_open_tasks}`} href={`/tasks?scope=all&owner=${m.member_id}`} />
+          <StatCard label="Overdue" value={m.overdue} tone={m.overdue ? 'red' : 'default'} href={`/tasks?scope=all&owner=${m.member_id}&due=overdue`} />
+          <StatCard label="Blocked" value={m.blocked} tone={m.blocked ? 'amber' : 'default'} href={`/tasks?scope=all&owner=${m.member_id}&status=Blocked`} />
+          <StatCard label="Overdue routines" value={m.routine_overdue} tone={m.routine_overdue ? 'red' : 'default'} href={`/routines?owner=${m.member_id}&status=Overdue`} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href={`/tasks?scope=all&owner=${m.member_id}`} className="btn-secondary">Tasks assigned to {m.name}</Link>
+          <Link href={`/routines?owner=${m.member_id}`} className="btn-secondary">{m.name}&apos;s routines</Link>
+        </div>
+      </section>
 
       <ActionForm action={updateMemberAction} className="card space-y-5 p-5">
         <input type="hidden" name="id" value={m.member_id} />
-        <MemberFields m={{ ...m, accepts_unmatched: raw.accepts_unmatched }} members={members} />
+        <MemberFields m={{ ...m, accepts_unmatched: raw.accepts_unmatched }} />
         <div className="flex justify-end"><SubmitButton>Save profile</SubmitButton></div>
       </ActionForm>
 

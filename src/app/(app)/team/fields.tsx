@@ -1,6 +1,6 @@
-import type { MemberOption, TeamRow } from '@/lib/types';
+import type { TeamRow } from '@/lib/types';
 
-export function MemberFields({ m, members }: { m?: Partial<TeamRow> & { accepts_unmatched?: boolean }; members: MemberOption[] }) {
+export function MemberFields({ m }: { m?: Partial<TeamRow> & { accepts_unmatched?: boolean } }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
@@ -14,7 +14,7 @@ export function MemberFields({ m, members }: { m?: Partial<TeamRow> & { accepts_
       <div className="sm:col-span-2">
         <label className="label" htmlFor="expertise">Expertise / Skills</label>
         <textarea id="expertise" name="expertise" rows={2} className="input" defaultValue={m?.expertise} maxLength={1000} />
-        <p className="mt-1 text-xs text-slate-500">Used to suggest owners for backlog items. Separate skills with commas.</p>
+        <p className="mt-1 text-xs text-slate-500">Used to suggest who should do backlog items. Separate skills with commas.</p>
       </div>
       <div>
         <label className="label" htmlFor="email">Email</label>
@@ -23,6 +23,7 @@ export function MemberFields({ m, members }: { m?: Partial<TeamRow> & { accepts_
       <div>
         <label className="label" htmlFor="max_open_tasks">Max Open Tasks</label>
         <input id="max_open_tasks" name="max_open_tasks" type="number" min={1} max={200} className="input" defaultValue={m?.max_open_tasks ?? 10} required />
+        <p className="mt-1 text-xs text-slate-500">Open tasks they can carry before showing At Capacity. Default 10.</p>
       </div>
       <div>
         <label className="label" htmlFor="access_role">Access level</label>
@@ -32,17 +33,9 @@ export function MemberFields({ m, members }: { m?: Partial<TeamRow> & { accepts_
           <option value="admin">Admin: manager + team and logins</option>
         </select>
       </div>
-      <div>
-        <label className="label" htmlFor="reports_to">Reports to</label>
-        <select id="reports_to" name="reports_to" className="input" defaultValue={m?.reports_to ?? ''}>
-          <option value="">Nobody</option>
-          {members.filter((o) => o.id !== m?.member_id).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-        <p className="mt-1 text-xs text-slate-500">The person they report to can see their tasks and routines.</p>
-      </div>
       <label className="flex items-center gap-2 text-sm sm:col-span-2">
         <input type="checkbox" name="accepts_unmatched" defaultChecked={m?.accepts_unmatched ?? false} />
-        Fallback owner: suggest this person when nobody&apos;s expertise matches a backlog item
+        Fallback: suggest this person when nobody&apos;s expertise matches a backlog item
       </label>
     </div>
   );

@@ -17,7 +17,6 @@ const memberSchema = z.object({
   email: z.preprocess((v) => (v === '' ? null : v), z.email('Email looks invalid').nullable()),
   max_open_tasks: z.coerce.number().int().min(1, 'Max Open Tasks must be at least 1').max(200),
   access_role: z.enum(['member', 'manager', 'admin']),
-  reports_to: z.preprocess((v) => (v === '' ? null : v), z.uuid().nullable()),
   accepts_unmatched: z.boolean(),
 });
 
@@ -69,7 +68,7 @@ export async function createMemberAction(_prev: ActionState, formData: FormData)
   if (login?.success) {
     const err = await provisionLogin(data.id, login.data);
     if (err) {
-      revalidatePath('/team');
+      revalidatePath('/', 'layout');
       redirect(`/team/${data.id}?loginError=${encodeURIComponent(err)}`);
     }
   }

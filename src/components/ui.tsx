@@ -17,6 +17,7 @@ const tones = {
   default: 'text-navy-900',
   red: 'text-red-700',
   amber: 'text-amber-700',
+  orange: 'text-orange-700',
   grey: 'text-slate-700',
   green: 'text-green-700',
 } as const;

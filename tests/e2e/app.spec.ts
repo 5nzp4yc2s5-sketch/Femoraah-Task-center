@@ -180,13 +180,20 @@ test('Dev ticks off a routine once per cycle', async ({ browser }) => {
 test('manager dashboard reflects the changes', async ({ browser }) => {
   const page = await as(browser, ADMIN);
   await page.goto('/manager');
-  const card = (label: string) => page.locator('.card', { hasText: label }).first();
+  const card = (label: string) => page.locator('a > .card', { hasText: label }).first();
   await expect(card('Open tasks')).toContainText('2');
   await expect(card('Blocked')).toContainText('1');
   await expect(card('Unassigned backlog')).toContainText('0');
-  await page.getByRole('link', { name: 'Shruti' }).click();
-  await expect(page.getByText('Shruti: open and recent tasks')).toBeVisible();
+  await expect(card('Routine completion rate')).toContainText('%');
+  await expect(card('Capacity utilization')).toContainText('%');
   await page.screenshot({ path: `${SHOTS}/06-manager-dashboard.png`, fullPage: true });
+  await card('Blocked').click();
+  await expect(page.getByRole('row', { name: /Update Myntra listing photos/ })).toBeVisible();
+  await page.goto('/manager');
+  await page.getByLabel('Employee').selectOption({ label: 'Shruti' });
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('Shruti: open and recent tasks')).toBeVisible();
+  await expect(card('Open tasks')).toContainText('1');
   await page.goto('/tasks?done=1');
   await expect(page.getByRole('heading', { name: 'Task Board' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/07-task-board.png`, fullPage: true });
