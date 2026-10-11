@@ -8,13 +8,24 @@ import type { TaskRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { FlagBadge, PriorityBadge, ProgressBar, StatusBadge } from '@/components/badges';
 import { LocalTime } from '@/components/local-time';
+import { FlagToggle, StatusSelect } from '@/components/status-select';
 import { Notice, SectionTitle } from '@/components/ui';
 import { addCollaboratorAction, removeCollaboratorAction, setArchivedAction, updateProgressAction, updateTaskAction } from '../actions';
 import { CoreFields, ProgressFields } from '../task-fields';
 
 export const metadata = { title: 'Task' };
 
-type HistoryItem = { at: string; kind: 'update' | 'assign'; text: string; who: string | null };
+type Activity = { at: string; kind: string; summary: string; actor_name: string | null };
+
+const KIND_DOT: Record<string, string> = {
+  assignment: 'bg-navy-700',
+  delegated_by: 'bg-navy-700',
+  blocker: 'bg-orange-500',
+  due_date: 'bg-amber-500',
+  start_date: 'bg-amber-500',
+  flagged: 'bg-amber-400',
+  progress: 'bg-slate-400',
+};
 
 export default async function TaskDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const { id } = await params;
@@ -25,11 +36,10 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const { data: task } = await supabase.from('task_board').select('*').eq('id', id).maybeSingle<TaskRow>();
   if (!task) notFound();
 
-  const [members, { data: collabs }, { data: updates }, { data: assigns }, backlog] = await Promise.all([
+  const [members, { data: collabs }, { data: activity, error: activityError }, backlog] = await Promise.all([
     activeMembers(),
     supabase.from('task_collaborators').select('member_id, added_at').eq('task_id', id),
-    supabase.from('task_updates').select('created_at, author_id, status, percent_complete, note').eq('task_id', id).order('created_at', { ascending: false }).limit(100),
-    supabase.from('task_assignments').select('created_at, from_owner_id, to_owner_id, changed_by, reason').eq('task_id', id).order('created_at', { ascending: false }),
+    supabase.from('task_activity').select('at, kind, summary, actor_name').eq('task_id', id).order('at', { ascending: false }).limit(200),
     task.backlog_item_id ? supabase.from('backlog_board').select('id, backlog_code').eq('id', task.backlog_item_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
@@ -40,20 +50,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const canProgress = canEdit || me.memberId === task.owner_id || collabIds.includes(me.memberId);
   const canArchive = me.isManager || me.memberId === task.created_by;
 
-  const history: HistoryItem[] = [
-    ...(updates ?? []).map((u) => ({
-      at: u.created_at,
-      kind: 'update' as const,
-      who: nameOf(u.author_id),
-      text: `${u.status} · ${u.percent_complete}%${u.note ? ` · “${u.note}”` : ''}`,
-    })),
-    ...(assigns ?? []).map((a) => ({
-      at: a.created_at,
-      kind: 'assign' as const,
-      who: nameOf(a.changed_by),
-      text: a.from_owner_id ? `Reassigned from ${nameOf(a.from_owner_id)} to ${nameOf(a.to_owner_id)}` : `${a.reason ?? 'Assigned'} → owner ${nameOf(a.to_owner_id)}`,
-    })),
-  ].sort((a, b) => b.at.localeCompare(a.at));
+  const history = (activity ?? []) as Activity[];
 
   return (
     <div className="max-w-5xl">
@@ -66,8 +63,13 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{task.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <FlagBadge flag={task.flag} />
-            <StatusBadge status={task.status} />
+            {canProgress && !task.archived_at ? <StatusSelect id={task.id} status={task.status} blocker={task.blocker_reason} /> : <StatusBadge status={task.status} />}
             <PriorityBadge priority={task.priority} />
+            {canProgress && !task.archived_at ? (
+              <FlagToggle id={task.id} on={task.is_flagged} />
+            ) : (
+              task.is_flagged && <span className="text-amber-500" title="Flagged as important">★</span>
+            )}
           </div>
         </div>
         {canArchive && (
@@ -81,13 +83,22 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
         )}
       </div>
 
+      {task.status === 'Blocked' && (
+        <div className="mb-5 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3" role="note">
+          <div className="text-xs font-semibold uppercase tracking-wide text-orange-800">
+            Blocked{task.blocked_at && <> since <LocalTime iso={task.blocked_at} /></>}
+          </div>
+          <p className="mt-1 whitespace-pre-wrap font-medium text-orange-900">{task.blocker_reason || 'No reason recorded'}</p>
+        </div>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <dl className="card grid grid-cols-2 gap-x-4 gap-y-3 p-5 text-sm sm:grid-cols-3">
             {[
-              ['Owner', task.owner_name],
-              ['Assigned By', task.assigned_by_name],
-              ['Created By', task.created_by_name],
+              ['Assigned To', task.owner_name],
+              ['Delegated By', task.assigned_by_name],
+              ['Entered By', task.created_by_name],
               ['Start Date', fmtDate(task.start_date)],
               ['Due Date', fmtDate(task.due_date)],
               ['Days Left', daysLeftLabel(task.days_left)],
@@ -103,7 +114,11 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
             </div>
             <div>
               <dt className="label">Last Update</dt>
-              <dd><LocalTime iso={task.last_update_at} /></dd>
+              <dd><LocalTime iso={task.last_update_at} />{task.is_stale && <span className="ml-1 text-xs font-semibold text-amber-700">· stale</span>}</dd>
+            </div>
+            <div>
+              <dt className="label">Created</dt>
+              <dd><LocalTime iso={task.created_at} /></dd>
             </div>
             {backlog?.data && (
               <div>
@@ -112,11 +127,11 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
               </div>
             )}
             <div className="col-span-2 sm:col-span-3">
-              <dt className="label">Details</dt>
+              <dt className="label">Description</dt>
               <dd className="whitespace-pre-wrap text-slate-700">{task.details || '—'}</dd>
             </div>
             <div className="col-span-2 sm:col-span-3">
-              <dt className="label">Progress Note / Blocker</dt>
+              <dt className="label">Progress Note</dt>
               <dd className="text-slate-700">{task.progress_note || '—'}</dd>
             </div>
           </dl>
@@ -134,7 +149,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
           {canEdit && !task.archived_at && (
             <details className="card p-5">
-              <summary className="cursor-pointer font-semibold text-navy-900">Edit task or reassign</summary>
+              <summary className="cursor-pointer font-semibold text-navy-900">Edit task, reassign or change who delegated it</summary>
               <ActionForm action={updateTaskAction} className="mt-4 space-y-4">
                 <input type="hidden" name="id" value={task.id} />
                 <CoreFields task={task} members={members} />
@@ -154,7 +169,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
                 <li key={cid} className="flex items-center justify-between text-sm">
                   <span>{nameOf(cid)}</span>
                   {canEdit && (
-                    <ConfirmAction action={removeCollaboratorAction} label="Remove" title={`Remove ${nameOf(cid)}?`} body="They will no longer see this task unless they own, created or assigned it." confirmLabel="Remove" className="btn-ghost px-2 py-1 text-xs text-red-700" hidden={{ task_id: task.id, member_id: cid }} />
+                    <ConfirmAction action={removeCollaboratorAction} label="Remove" title={`Remove ${nameOf(cid)}?`} body="They will no longer see this task unless it is assigned to them, they entered it or they delegated it." confirmLabel="Remove" className="btn-ghost px-2 py-1 text-xs text-red-700" hidden={{ task_id: task.id, member_id: cid }} />
                   )}
                 </li>
               ))}
@@ -173,13 +188,15 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
           <section className="card p-5">
             <SectionTitle>History</SectionTitle>
+            {activityError && <p className="text-sm text-red-700">Could not load the history.</p>}
+            {history.length === 0 && !activityError && <p className="text-sm text-slate-500">No changes recorded yet.</p>}
             <ol className="space-y-3">
               {history.map((h, i) => (
                 <li key={i} className="flex gap-2.5 text-sm">
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${h.kind === 'assign' ? 'bg-navy-700' : 'bg-slate-400'}`} aria-hidden />
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${KIND_DOT[h.kind] ?? 'bg-slate-300'}`} aria-hidden />
                   <div>
-                    <div className="text-slate-800">{h.text}</div>
-                    <div className="text-xs text-slate-500">{h.who} · <LocalTime iso={h.at} /></div>
+                    <div className="text-slate-800">{h.summary}</div>
+                    <div className="text-xs text-slate-500">{h.actor_name ?? 'System'} · <LocalTime iso={h.at} /></div>
                   </div>
                 </li>
               ))}

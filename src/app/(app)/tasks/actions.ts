@@ -11,20 +11,34 @@ import { PRIORITIES, STATUSES, type ActionState } from '@/lib/types';
 const optDate = z.preprocess((v) => (v === '' || v === null ? null : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable());
 const pctField = z.coerce.number().int('Use a whole number').min(0, '% Complete must be 0-100').max(100, '% Complete must be 0-100');
 
+const checkbox = z.preprocess((v) => v === '1' || v === 'on' || v === true, z.boolean());
+
 const coreSchema = z.object({
   title: z.string().trim().min(1, 'Task is required').max(200),
   details: z.string().max(5000).default(''),
-  owner_id: z.uuid('Choose an owner'),
+  owner_id: z.uuid('Choose who the task is assigned to'),
+  assigned_by: z.uuid('Choose who delegated the task'),
   priority: z.enum(PRIORITIES),
   start_date: optDate,
   due_date: optDate,
+  is_flagged: checkbox,
 });
 
 const progressSchema = z.object({
   status: z.enum(STATUSES),
   percent_complete: pctField,
-  progress_note: z.string().max(1000).default(''),
+  progress_note: z.string().trim().max(1000).default(''),
+  blocker_reason: z.string().trim().max(1000).default(''),
 });
+
+type Progress = z.infer<typeof progressSchema>;
+
+/** Blocked needs a reason; any other status clears it (the database does the same). */
+function checkBlocker(p: Progress): string | null {
+  if (p.status === 'Blocked' && !p.blocker_reason) return 'Say what is blocking this task in the blocker reason.';
+  if (p.status !== 'Blocked') p.blocker_reason = '';
+  return null;
+}
 
 function datesOk(d: { start_date: string | null; due_date: string | null }) {
   return !d.start_date || !d.due_date || d.due_date >= d.start_date;
@@ -37,6 +51,8 @@ export async function createTaskAction(_prev: ActionState, formData: FormData): 
   if (!core.success) return { error: core.error.issues[0].message };
   if (!progress.success) return { error: progress.error.issues[0].message };
   if (!datesOk(core.data)) return { error: 'Due date cannot be before the start date.' };
+  const blocker = checkBlocker(progress.data);
+  if (blocker) return { error: blocker };
   const supabase = await createClient();
   const { data, error } = await supabase.from('tasks').insert({ ...core.data, ...progress.data }).select('id').single();
   if (error) return { error: friendlyError(error.message) };
@@ -69,15 +85,52 @@ export async function updateProgressAction(_prev: ActionState, formData: FormDat
   const progress = progressSchema.safeParse(Object.fromEntries(formData));
   if (!id.success) return { error: 'Unknown task.' };
   if (!progress.success) return { error: progress.error.issues[0].message };
-  if (progress.data.status === 'Blocked' && !progress.data.progress_note.trim()) {
-    return { error: 'Say what is blocking you in the progress note.' };
-  }
+  const blocker = checkBlocker(progress.data);
+  if (blocker) return { error: blocker };
   const supabase = await createClient();
   const { data, error } = await supabase.from('tasks').update(progress.data).eq('id', id.data).select('id');
   if (error) return { error: friendlyError(error.message) };
   if (!data?.length) return { error: 'You do not have permission to update this task.' };
   revalidatePath('/', 'layout');
   return { ok: 'Progress saved. Last Update set to now.' };
+}
+
+const quickSchema = z.object({
+  id: z.uuid(),
+  status: z.enum(STATUSES),
+  blocker_reason: z.string().trim().max(1000).default(''),
+});
+
+/** Change status straight from the Task Board or task page. */
+export async function quickStatusAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireMe();
+  const parsed = quickSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { id, status, blocker_reason } = parsed.data;
+  if (status === 'Blocked' && !blocker_reason) return { error: 'Say what is blocking this task.' };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ status, blocker_reason: status === 'Blocked' ? blocker_reason : '' })
+    .eq('id', id)
+    .select('id, status');
+  if (error) return { error: friendlyError(error.message) };
+  if (!data?.length) return { error: 'You do not have permission to update this task.' };
+  revalidatePath('/', 'layout');
+  return { ok: `Status set to ${data[0].status}.` };
+}
+
+export async function toggleFlagAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireMe();
+  const id = z.uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Unknown task.' };
+  const on = formData.get('flag') === '1';
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('tasks').update({ is_flagged: on }).eq('id', id.data).select('id');
+  if (error) return { error: friendlyError(error.message) };
+  if (!data?.length) return { error: 'You do not have permission to update this task.' };
+  revalidatePath('/', 'layout');
+  return { ok: on ? 'Flagged as important.' : 'Flag removed.' };
 }
 
 export async function setArchivedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

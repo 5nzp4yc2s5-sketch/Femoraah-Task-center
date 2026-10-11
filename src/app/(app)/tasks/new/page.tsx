@@ -13,9 +13,12 @@ export default async function NewTask() {
   const members = await activeMembers();
   return (
     <div className="max-w-3xl">
-      <PageHeader title="New task" subtitle={`Assigned work goes on the Task Board. You (${me.name}) will be recorded as Assigned By and can track it.`} />
+      <PageHeader
+        title="New task"
+        subtitle="Choose who delegated the task and who it is assigned to. Both can follow it on the Task Board; you are recorded as the person who entered it."
+      />
       <ActionForm action={createTaskAction} className="card space-y-6 p-5">
-        <CoreFields members={members} task={{ owner_id: me.memberId }} />
+        <CoreFields members={members} task={{ owner_id: me.memberId, assigned_by: me.memberId }} />
         <ProgressFields />
         <fieldset>
           <legend className="label">Collaborators (optional)</legend>

@@ -12,6 +12,8 @@ const ITEMS: Item[] = [
   { href: '/tasks', label: 'Task Board', icon: 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01' },
   { href: '/backlog', label: 'Pending Backlog', icon: 'M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4m16 0h-5l-1 2h-4l-1-2H4' },
   { href: '/routines', label: 'Routine Tasks', icon: 'M4 4v5h5M20 20v-5h-5M5.6 15a7 7 0 0012.3 2M18.4 9A7 7 0 006.1 7' },
+  { href: '/calendar', label: 'Team Calendar', icon: 'M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z' },
+  { href: '/attendance', label: 'Attendance', icon: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { href: '/team', label: 'Team', icon: 'M17 20h5v-2a3 3 0 00-5.4-1.8M17 20H7m10 0v-2c0-.7-.1-1.3-.4-1.8M7 20H2v-2a3 3 0 015.4-1.8M7 20v-2c0-.7.1-1.3.4-1.8m0 0a5 5 0 019.2 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
   { href: '/data-review', label: 'Data Review', icon: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z', managerOnly: true },
   { href: '/help', label: 'How It Works', icon: 'M8.2 9a4 4 0 017.6 1c0 2-3 2.5-3 4.5M12 18h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },

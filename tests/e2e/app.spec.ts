@@ -67,37 +67,57 @@ test('admin signs in with username + PIN and creates logins from the Team page',
   await page.screenshot({ path: `${SHOTS}/02-team.png`, fullPage: true });
 });
 
-test('admin assigns a task to Shruti and can track it', async ({ browser }) => {
+test('admin delegates a task to Shruti and can track it', async ({ browser }) => {
   const page = await as(browser, ADMIN);
   await page.goto('/tasks/new');
+  await expect(page.getByLabel('Owner')).toHaveCount(0);
+  await expect(page.getByLabel('Delegated by')).toHaveValue(/.+/); // defaults to the person entering it
   await page.getByLabel('Task', { exact: true }).fill('Update Myntra listing photos');
-  await page.getByLabel('Details').fill('Replace the 12 kurta listings with new shoot photos');
-  await page.getByLabel('Owner').selectOption({ label: 'Shruti' });
-  await page.getByLabel('Priority').selectOption('High');
+  await page.getByLabel('Description').fill('Replace the 12 kurta listings with new shoot photos');
+  await page.getByLabel('Assigned to').selectOption({ label: 'Shruti' });
+  await page.getByLabel('Priority').selectOption('Critical');
   await page.getByLabel('Due Date').fill(isoIn(2));
+  await page.getByLabel('Flag as important').check();
   await page.getByRole('button', { name: 'Create task' }).click();
   await expect(page.getByText('Task created and assigned to Shruti.')).toBeVisible();
   taskUrl = new URL(page.url()).pathname;
   await expect(page.getByText('Due soon').filter({ visible: true }).first()).toBeVisible();
-  await page.goto('/');
-  await expect(page.getByText('Update Myntra listing photos').filter({ visible: true }).first()).toBeVisible(); // under "Tasks I assigned to others"
+  await expect(page.getByText(/^TSK-\d{3}$/)).toBeVisible();
+  await page.goto('/tasks?scope=assigned');
+  await expect(page.getByText('Update Myntra listing photos').filter({ visible: true }).first()).toBeVisible();
 });
 
-test('Shruti sees and updates her task; a blocker needs a note', async ({ browser }) => {
+test('Shruti blocks her task with a reason, then unblocks it from the board', async ({ browser }) => {
   const page = await as(browser, PEOPLE.Shruti);
   await expect(page.getByText('Update Myntra listing photos').filter({ visible: true }).first()).toBeVisible();
   await page.goto(taskUrl);
-  await page.getByLabel('Status').selectOption('Blocked');
+  await page.getByLabel('Status', { exact: true }).selectOption('Blocked');
   await page.getByLabel('% Complete').fill('30');
-  await page.getByLabel('Progress Note / Blocker').fill('');
-  await page.getByRole('button', { name: 'Save progress' }).click();
-  await expect(page.locator('form [role=alert]')).toContainText('Say what is blocking you');
-  await page.getByLabel('Progress Note / Blocker').fill('Waiting for photos from the studio');
+  await expect(page.getByLabel(/Blocker reason/)).toBeVisible();
+  await page.getByLabel(/Blocker reason/).fill('Waiting for photos from the studio');
   await page.getByRole('button', { name: 'Save progress' }).click();
   await expect(page.getByText('Progress saved.')).toBeVisible();
-  await expect(page.getByText('Edit task or reassign')).toHaveCount(0); // owner cannot edit core fields
+  await expect(page.getByText(/Edit task, reassign/)).toHaveCount(0); // the assignee cannot edit core fields
   await page.reload();
+  await expect(page.getByRole('note')).toContainText('Waiting for photos from the studio');
+  await expect(page.getByText('Blocked: “Waiting for photos from the studio”')).toBeVisible(); // history
   await page.screenshot({ path: `${SHOTS}/03-task-detail.png`, fullPage: true });
+
+  await page.goto('/tasks');
+  const row = page.getByRole('row', { name: /Update Myntra listing photos/ });
+  await expect(row).toContainText('Blocked: Waiting for photos from the studio');
+  await row.getByLabel('Change status').selectOption('Active');
+  await expect(row.getByLabel('Change status')).toHaveValue('Active');
+  await page.reload();
+  await expect(page.getByRole('row', { name: /Update Myntra listing photos/ })).not.toContainText('Waiting for photos');
+  await page.goto(taskUrl);
+  await expect(page.getByText(/Blocker cleared/)).toBeVisible();
+  // and back to Blocked from the board, which asks for the reason first
+  await page.goto('/tasks');
+  await page.getByRole('row', { name: /Update Myntra listing photos/ }).getByLabel('Change status').selectOption('Blocked');
+  await page.getByRole('dialog').getByLabel('Blocker reason').fill('Studio closed until Monday');
+  await page.getByRole('dialog').getByRole('button', { name: 'Mark Blocked' }).click();
+  await expect(page.getByRole('row', { name: /Update Myntra listing photos/ })).toContainText('Studio closed until Monday');
 });
 
 test('Zinia cannot open Shruti\'s task by URL and cannot see the manager dashboard', async ({ browser }) => {

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { TaskRow } from '@/lib/types';
 import { daysLeftLabel, fmtDate } from '@/lib/format';
-import { FlagBadge, PriorityBadge, ProgressBar, StatusBadge, flagStyles } from './badges';
+import { FlagBadge, FlaggedStar, PriorityBadge, ProgressBar, StatusBadge, flagStyles } from './badges';
 import { LocalTime } from './local-time';
+import { StatusSelect } from './status-select';
 import { EmptyState } from './ui';
 
 function DaysLeft({ row }: { row: TaskRow }) {
@@ -11,15 +12,37 @@ function DaysLeft({ row }: { row: TaskRow }) {
   return <span className={`tabular-nums ${tone}`}>{daysLeftLabel(n)}</span>;
 }
 
-/** The Task Board's 14 source columns, with spreadsheet-style row colouring by flag. */
+function NoteOrBlocker({ row, clamp = true }: { row: TaskRow; clamp?: boolean }) {
+  if (row.status === 'Blocked' && row.blocker_reason) {
+    return (
+      <span className={`${clamp ? 'line-clamp-2' : ''} font-medium text-orange-800`}>
+        Blocked: {row.blocker_reason}
+        {row.blocked_at && <span className="font-normal text-orange-700/80"> · since <LocalTime iso={row.blocked_at} mode="date" /></span>}
+      </span>
+    );
+  }
+  return <span className={clamp ? 'line-clamp-2' : ''}>{row.progress_note || '—'}</span>;
+}
+
+type Viewer = { memberId: string; isManager: boolean };
+
+/** Who may change status from the board: managers, the assignee, the creator and the delegator. */
+function canChangeStatus(row: TaskRow, me?: Viewer) {
+  if (!me || row.archived_at) return false;
+  return me.isManager || [row.owner_id, row.created_by, row.assigned_by].includes(me.memberId);
+}
+
+/** The Task Board's source columns, with spreadsheet-style row colouring by flag. */
 export function TaskTable({
   rows,
   compact = false,
   empty,
+  me,
 }: {
   rows: TaskRow[];
   compact?: boolean;
   empty?: { title: string; body?: string; action?: React.ReactNode };
+  me?: Viewer;
 }) {
   if (rows.length === 0) {
     return <EmptyState title={empty?.title ?? 'No tasks here'} body={empty?.body} action={empty?.action} />;
@@ -34,7 +57,7 @@ export function TaskTable({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs text-slate-500">{r.task_code}</div>
-                  <div className="font-medium text-navy-900">{r.title}</div>
+                  <div className="font-medium text-navy-900">{r.title} <FlaggedStar on={r.is_flagged} /></div>
                 </div>
                 <FlagBadge flag={r.flag} />
               </div>
@@ -42,13 +65,16 @@ export function TaskTable({
                 <StatusBadge status={r.status} />
                 <PriorityBadge priority={r.priority} />
                 <span>{r.owner_name}</span>
+                {r.assigned_by_name && r.assigned_by !== r.owner_id && <span className="text-slate-500">· from {r.assigned_by_name}</span>}
                 <span>· Due {fmtDate(r.due_date)}</span>
                 <span>· <DaysLeft row={r} /></span>
               </div>
               <div className="mt-2">
                 <ProgressBar value={r.percent_complete} />
               </div>
-              {r.progress_note && <p className="mt-1.5 line-clamp-2 text-xs text-slate-600">{r.progress_note}</p>}
+              {(r.progress_note || (r.status === 'Blocked' && r.blocker_reason)) && (
+                <p className="mt-1.5 text-xs text-slate-600"><NoteOrBlocker row={r} /></p>
+              )}
             </Link>
           </li>
         ))}
@@ -61,9 +87,9 @@ export function TaskTable({
             <tr>
               <th>Task ID</th>
               <th>Task</th>
-              {!compact && <th>Details</th>}
-              <th>Owner</th>
-              {!compact && <th>Assigned By</th>}
+              {!compact && <th>Description</th>}
+              <th>Assigned To</th>
+              {!compact && <th>Delegated By</th>}
               <th>Priority</th>
               <th>Status</th>
               {!compact && <th>Start Date</th>}
@@ -82,18 +108,18 @@ export function TaskTable({
                   <Link href={`/tasks/${r.id}`} className="hover:underline">{r.task_code}</Link>
                 </td>
                 <td className="min-w-48 font-medium text-navy-900">
-                  <Link href={`/tasks/${r.id}`} className="hover:underline">{r.title}</Link>
+                  <Link href={`/tasks/${r.id}`} className="hover:underline">{r.title}</Link> <FlaggedStar on={r.is_flagged} />
                 </td>
                 {!compact && <td className="max-w-64 text-slate-600"><span className="line-clamp-2">{r.details || '—'}</span></td>}
                 <td className="whitespace-nowrap">{r.owner_name}</td>
                 {!compact && <td className="whitespace-nowrap text-slate-600">{r.assigned_by_name}</td>}
                 <td><PriorityBadge priority={r.priority} /></td>
-                <td><StatusBadge status={r.status} /></td>
+                <td>{canChangeStatus(r, me) ? <StatusSelect id={r.id} status={r.status} blocker={r.blocker_reason} /> : <StatusBadge status={r.status} />}</td>
                 {!compact && <td className="whitespace-nowrap tabular-nums">{fmtDate(r.start_date)}</td>}
                 <td className="whitespace-nowrap tabular-nums">{fmtDate(r.due_date)}</td>
                 <td><ProgressBar value={r.percent_complete} /></td>
                 <td className="whitespace-nowrap text-xs text-slate-600"><LocalTime iso={r.last_update_at} mode="date" /></td>
-                {!compact && <td className="max-w-64 text-slate-600"><span className="line-clamp-2">{r.progress_note || '—'}</span></td>}
+                {!compact && <td className="max-w-64 text-slate-600"><NoteOrBlocker row={r} /></td>}
                 <td className="whitespace-nowrap"><DaysLeft row={r} /></td>
                 <td><FlagBadge flag={r.flag} /></td>
               </tr>
@@ -112,8 +138,10 @@ function flagBorder(flag: string) {
     case 'Due soon':
     case 'Stale':
       return 'border-l-amber-500';
+    case 'Due in 7 days':
+      return 'border-l-yellow-400';
     case 'Blocked':
-      return 'border-l-slate-500';
+      return 'border-l-orange-500';
     case 'Done':
       return 'border-l-green-600';
     default:

@@ -1,11 +1,18 @@
-export const STATUSES = ['Not Started', 'In Progress', 'Blocked', 'Done'] as const;
-export const PRIORITIES = ['High', 'Medium', 'Low'] as const;
+export const STATUSES = ['To Do', 'Active', 'Blocked', 'Done'] as const;
+export const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'] as const;
 export const FREQUENCIES = ['Daily', 'Weekly', 'Monthly', 'Custom'] as const;
-export const FLAGS = ['Overdue', 'Due soon', 'Stale', 'Blocked', 'On track', 'Done'] as const;
+export const FLAGS = ['Overdue', 'Blocked', 'Due soon', 'Stale', 'Due in 7 days', 'On track', 'Done'] as const;
+export const CAPACITY_STATUSES = ['Available', 'At Capacity', 'Overloaded', 'On Leave'] as const;
+export const BACKLOG_STATUSES = ['Pending', 'Approved', 'Converted to Task', 'Dismissed'] as const;
+export const ROUTINE_STATUSES = ['OK', 'Due Today', 'Overdue', 'Not Logged', 'Paused'] as const;
+export const LEAVE_TYPES = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Holiday Swap', 'Other'] as const;
 
 export type TaskStatus = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type Flag = (typeof FLAGS)[number];
+export type CapacityStatus = (typeof CAPACITY_STATUSES)[number];
+export type BacklogStatus = (typeof BACKLOG_STATUSES)[number];
+export type RoutineStatus = (typeof ROUTINE_STATUSES)[number];
 
 export interface TaskRow {
   id: string;
@@ -32,6 +39,12 @@ export interface TaskRow {
   created_at: string;
   days_left: number | null;
   flag: Flag;
+  is_stale: boolean;
+  blocker_reason: string;
+  blocked_at: string | null;
+  is_flagged: boolean;
+  updated_at: string;
+  days_since_update: number;
 }
 
 export interface BacklogRow {
@@ -53,7 +66,8 @@ export interface BacklogRow {
   suggestion_candidates: Candidate[];
   suggested_at: string | null;
   approval: 'Pending' | 'Yes' | 'No';
-  status: 'Open' | 'Assigned' | 'Rejected';
+  status: BacklogStatus;
+  decided_by: string | null;
   decided_by_name: string | null;
   decided_at: string | null;
   final_owner_id: string | null;
@@ -61,6 +75,10 @@ export interface BacklogRow {
   overrode_suggestion: boolean | null;
   decision_note: string | null;
   task_id: string | null;
+  converted_by: string | null;
+  converted_by_name: string | null;
+  converted_at: string | null;
+  override_leave: boolean;
 }
 
 export interface Candidate {
@@ -74,6 +92,8 @@ export interface Candidate {
   blocked: number;
   max: number;
   has_capacity: boolean;
+  on_leave: boolean;
+  eligible: boolean;
   fallback: boolean;
 }
 
@@ -89,7 +109,16 @@ export interface RoutineRow {
   last_done: string | null;
   times_done: number;
   next_due: string | null;
-  status: 'OK' | 'Due today' | 'Overdue' | 'Not logged yet' | 'Paused';
+  status: RoutineStatus;
+  routine_no: number;
+  routine_code: string;
+  backup_member_id: string | null;
+  backup_name: string | null;
+  owner_on_leave: boolean;
+  covered_by_id: string | null;
+  covered_by_name: string | null;
+  last_completed_at: string | null;
+  done_today: boolean;
 }
 
 export interface TeamRow {
@@ -100,7 +129,6 @@ export interface TeamRow {
   email: string | null;
   max_open_tasks: number;
   access_role: 'admin' | 'manager' | 'member';
-  reports_to: string | null;
   is_active: boolean;
   has_login: boolean;
   username: string | null;
@@ -108,6 +136,55 @@ export interface TeamRow {
   overdue: number;
   blocked: number;
   has_capacity: boolean;
+  routine_overdue: number;
+  on_leave: boolean;
+  leave_until: string | null;
+  capacity_status: CapacityStatus;
+}
+
+/** One entry from team_calendar(): a company holiday or someone's leave. */
+export interface CalendarEntry {
+  kind: 'holiday' | 'leave';
+  id: string;
+  member_id: string | null;
+  member_name: string | null;
+  start_date: string;
+  end_date: string;
+  label: string;
+  backup_member_id: string | null;
+  backup_name: string | null;
+  note: string;
+  can_edit: boolean;
+}
+
+/** One person-day from attendance_report(). Times are timestamptz ISO strings. */
+export interface AttendanceRow {
+  member_id: string;
+  member_name: string;
+  work_date: string;
+  day_type: 'On Leave' | 'Holiday' | 'No Schedule' | 'Weekly Off' | 'Working Day';
+  holiday_name: string | null;
+  leave_type: string | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  grace_minutes: number | null;
+  break_minutes: number | null;
+  tz: string;
+  first_login: string | null;
+  last_logout: string | null;
+  session_count: number;
+  open_session: boolean;
+  incomplete_sessions: number;
+  worked_minutes: number;
+  minutes_late: number | null;
+  minutes_early: number | null;
+  minutes_overtime: number | null;
+  login_status: string;
+  logout_status: string | null;
+  corrected: boolean;
+  record_id: string | null;
+  open_flags: number;
+  pending_correction: boolean;
 }
 
 export interface MemberOption {

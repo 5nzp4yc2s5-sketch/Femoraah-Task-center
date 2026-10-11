@@ -11,7 +11,7 @@ You never paste secrets into chat or commit them to GitHub; they go only into th
 ## 1. Supabase project
 
 1. Sign in at supabase.com → **New project**. Name `opspulse`, region **Mumbai (ap-south-1)**, generate a strong database password and keep it in your password manager.
-2. **SQL Editor → New query**: paste the whole of `docs/all-migrations.sql` and **Run**. (Or, with the Supabase CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`.) This creates the tables, RLS policies and the seed team/routines from your spreadsheet.
+2. **SQL Editor → New query**: paste the whole of `docs/all-migrations.sql` and **Run**. Then open a **second** new query, paste `docs/all-migrations-part2.sql` and **Run** (it must be a separate run: new status names have to be saved before the second file uses them). (Or, with the Supabase CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`.) This creates the tables, RLS policies, the seed team/routines from your spreadsheet, the Team Calendar and attendance tracking.
 3. **Authentication → Sign In / Providers**:
    - Turn **off** "Allow new users to sign up". (No public signup; only the admin creates logins.)
    - Email provider: turn **off** "Confirm email" is fine (logins are created pre-confirmed).
@@ -67,6 +67,7 @@ Backups on Free: **Database → Backups** is not included, so run `npx supabase 
 1. Open the URL signed out → you land on the sign-in page.
 2. Sign in as Kartik (username and PIN) → Dashboard shows 5 people and "12 records need review".
 3. Create a login for one teammate; in a private window sign in as them and confirm they see only their own tasks and routines.
-4. Create a task for them as Kartik; confirm it appears for them, and that "Tasks I assigned to others" shows it for you.
+4. Create a task for them as Kartik (Delegated by: you, Assigned to: them); confirm it appears for them, and that the Task Board's "Delegated by me" tab shows it for you.
 5. Have them add a backlog item; approve it as Kartik; confirm exactly one task appears.
 6. Enter a wrong PIN five times in a private window → the account locks until you reset that PIN on the Team page.
+7. **Attendance → Schedules**: everyone starts on 10:00-19:00, Monday to Saturday, 10 minutes' grace. Set each person's real hours (they apply from the day you choose). Then sign in as a teammate and check that **Attendance** shows their sign-in time and only their own records.
