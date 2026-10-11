@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:db": "node scripts/run-db-tests.mjs",
+    "test:db": "vitest run tests/db",
     "bootstrap-admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {

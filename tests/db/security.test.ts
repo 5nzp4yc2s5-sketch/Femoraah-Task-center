@@ -194,27 +194,32 @@ describe('task visibility and permissions', () => {
     expect(data!.find((r) => r.id === assigned.id)!.created_by_name).toBe('Shruti');
   });
 
-  it('assigned_by and created_by are always the signed-in member (no spoofing)', async () => {
+  it('created_by is always the signed-in member; Delegated By defaults to them and must be an active member', async () => {
     const d = await login('Dev');
     const { data, error } = await d.from('tasks')
-      .insert({ title: 'spoof', owner_id: ids.Dev, created_by: ids.Kartik, assigned_by: ids.Kartik } as never).select();
-    // column-level grants reject the spoofed columns outright
+      .insert({ title: 'spoof', owner_id: ids.Dev, created_by: ids.Kartik } as never).select();
+    // column-level grants reject the spoofed column outright
     expect(error).not.toBeNull();
     expect(data).toBeNull();
     const ok = await createTask(d, 'Dev');
     expect(ok.created_by).toBe(ids.Dev);
     expect(ok.assigned_by).toBe(ids.Dev);
+    const named = await createTask(d, 'Dev', { assigned_by: ids.Kartik });
+    expect(named).toMatchObject({ created_by: ids.Dev, assigned_by: ids.Kartik });
+    await db.query('update public.members set is_active = false where id = $1', [ids.Zinia]);
+    const { error: e2 } = await d.from('tasks').insert({ title: 'x', owner_id: ids.Dev, assigned_by: ids.Zinia });
+    expect(e2?.message).toMatch(/Delegated by must be an active team member/);
   });
 
   it('owner can update progress but not reassign, retitle or move the due date', async () => {
     const k = await login('Kartik');
-    const t = await createTask(k, 'Dev', { due_date: await sqlDate('current_date + 5') });
+    const t = await createTask(k, 'Dev', { due_date: await sqlDate('private.today() + 5') });
     const d = await login('Dev');
-    const { error: okErr } = await d.from('tasks').update({ status: 'In Progress', percent_complete: 40, progress_note: 'Half packed' }).eq('id', t.id);
+    const { error: okErr } = await d.from('tasks').update({ status: 'Active', percent_complete: 40, progress_note: 'Half packed' }).eq('id', t.id);
     expect(okErr).toBeNull();
     const { error: e1 } = await d.from('tasks').update({ owner_id: ids.Zinia }).eq('id', t.id);
     expect(e1?.message).toMatch(/only update status/);
-    const { error: e2 } = await d.from('tasks').update({ due_date: await sqlDate('current_date + 30') }).eq('id', t.id);
+    const { error: e2 } = await d.from('tasks').update({ due_date: await sqlDate('private.today() + 30') }).eq('id', t.id);
     expect(e2?.message).toMatch(/only update status/);
     const { data: updates } = await d.from('task_updates').select('*').eq('task_id', t.id).order('created_at');
     expect(updates!.at(-1)!.note).toBe('Half packed');
@@ -227,7 +232,7 @@ describe('task visibility and permissions', () => {
     const { data } = await z.from('tasks').update({ status: 'Done' }).eq('id', t.id).select();
     expect(data ?? []).toHaveLength(0);
     const r = await db.query('select status from public.tasks where id = $1', [t.id]);
-    expect(r.rows[0].status).toBe('Not Started');
+    expect(r.rows[0].status).toBe('To Do');
     const { error } = await z.from('tasks').delete().eq('id', t.id);
     expect(error).not.toBeNull();
   });
@@ -254,11 +259,13 @@ describe('task visibility and permissions', () => {
     expect((await z.from('tasks').select('id').eq('id', t.id)).data).toHaveLength(0);
   });
 
-  it('supervisor (Sanket) can see Dev\'s tasks; Zinia cannot', async () => {
+  it('there is no supervisor visibility: Sanket cannot see Dev\'s tasks, nor can Zinia', async () => {
+    await db.query("update public.members set reports_to = (select id from public.members where name = 'Sanket') where name = 'Dev'");
     const k = await login('Kartik');
     const t = await createTask(k, 'Dev');
     const sa = await login('Sanket');
-    expect((await sa.from('tasks').select('id').eq('id', t.id)).data).toHaveLength(1);
+    expect((await sa.from('tasks').select('id').eq('id', t.id)).data).toHaveLength(0);
+    await db.query("update public.members set reports_to = null where name = 'Dev'");
     const z = await login('Zinia');
     expect((await z.from('tasks').select('id').eq('id', t.id)).data).toHaveLength(0);
   });
@@ -286,14 +293,15 @@ describe('task visibility and permissions', () => {
 });
 
 describe('flags and dashboards', () => {
-  it('flags follow the precedence Done > Overdue > Blocked > Due soon > Stale > On track', async () => {
+  it('flags follow the precedence Done > Overdue > Blocked > Due soon > Stale > Due in 7 days > On track', async () => {
     const k = await login('Kartik');
-    const past = await sqlDate('current_date - 2');
-    const soon = await sqlDate('current_date + 2');
-    const later = await sqlDate('current_date + 20');
+    const past = await sqlDate('private.today() - 2');
+    const soon = await sqlDate('private.today() + 2');
+    const later = await sqlDate('private.today() + 20');
     const done = await createTask(k, 'Shruti', { title: 'done', due_date: past, status: 'Done' });
-    const overdueBlocked = await createTask(k, 'Shruti', { title: 'od', due_date: past, status: 'Blocked' });
-    const blocked = await createTask(k, 'Shruti', { title: 'bl', due_date: later, status: 'Blocked' });
+    const overdueBlocked = await createTask(k, 'Shruti', { title: 'od', due_date: past, status: 'Blocked', blocker_reason: 'Waiting' });
+    const blocked = await createTask(k, 'Shruti', { title: 'bl', due_date: later, status: 'Blocked', blocker_reason: 'Waiting' });
+    const week = await createTask(k, 'Shruti', { title: 'week', due_date: await sqlDate('private.today() + 6') });
     const dueSoon = await createTask(k, 'Shruti', { title: 'soon', due_date: soon });
     const stale = await createTask(k, 'Shruti', { title: 'stale', due_date: later });
     const fine = await createTask(k, 'Shruti', { title: 'fine', due_date: later });
@@ -308,17 +316,18 @@ describe('flags and dashboards', () => {
     expect(flag(dueSoon.id)).toBe('Due soon');
     expect(flag(stale.id)).toBe('Stale');
     expect(flag(fine.id)).toBe('On track');
+    expect(flag(week.id)).toBe('Due in 7 days');
     expect(data!.find((r) => r.id === done.id)!.days_left).toBeNull();
     expect(data!.find((r) => r.id === dueSoon.id)!.days_left).toBe(2);
   });
 
   it('manager dashboard counts update after changes; members cannot open it', async () => {
     const k = await login('Kartik');
-    const past = await sqlDate('current_date - 1');
+    const past = await sqlDate('private.today() - 1');
     const before = (await k.rpc('manager_dashboard')).data;
     expect(before.open).toBe(0);
     const t = await createTask(k, 'Sanket', { due_date: past });
-    await createTask(k, 'Sanket', { status: 'Blocked', due_date: await sqlDate('current_date + 3') });
+    await createTask(k, 'Sanket', { status: 'Blocked', blocker_reason: 'No stock', due_date: await sqlDate('private.today() + 3') });
     const mid = (await k.rpc('manager_dashboard')).data;
     expect(mid).toMatchObject({ open: 2, overdue: 1, blocked: 1, due_next_7: 1 });
     const sanket = mid.people.find((p: { name: string }) => p.name === 'Sanket');
@@ -347,7 +356,7 @@ describe('flags and dashboards', () => {
 describe('backlog workflow', () => {
   async function submit(c: SupabaseClient, skills: string, title = 'New work') {
     const { data, error } = await c.from('backlog_items')
-      .insert({ title, skills_needed: skills, priority: 'High', due_date: await sqlDate('current_date + 5') }).select('id').single();
+      .insert({ title, skills_needed: skills, priority: 'High', due_date: await sqlDate('private.today() + 5') }).select('id').single();
     if (error) throw error;
     const { data: row } = await c.from('backlog_board').select('*').eq('id', data.id).single();
     return row!;
@@ -358,7 +367,8 @@ describe('backlog workflow', () => {
     const row = await submit(z, 'packing count, dispatch');
     expect(row.requested_by_name).toBe('Zinia');
     expect(row.suggested_owner_name).toBe('Sanket');
-    expect(row.suggestion_reason).toMatch(/matches 2 of 2/);
+    expect(row.suggestion_reason).toMatch(/matches 2 of 2 skill\(s\)/);
+    expect(row.suggestion_reason).toMatch(/of 10 open-task slots used; no overdue tasks/);
     const row2 = await submit(z, 'NDR, order confirmation calls');
     expect(row2.suggested_owner_name).toBe('Zinia');
     const row3 = await submit(z, 'Listings, exchanges');
@@ -382,15 +392,15 @@ describe('backlog workflow', () => {
     for (let i = 0; i < 4; i++) await createTask(k, 'Sanket');
     const row = await submit(k, 'dispatch');
     expect(row.suggested_owner_name).toBe('Dev');
-    expect(row.suggestion_reason).toMatch(/Next best: Sanket/);
-    await db.query("update public.members set expertise = 'Packing, plus tasks assigned by Sanket' where name = 'Dev'");
+    expect(row.suggestion_reason).toMatch(/Alternatives: Sanket/);
+    await db.query("update public.members set expertise = 'Packing' where name = 'Dev'");
   });
 
   it('unmatched skills fall back to the fallback owner with capacity', async () => {
     const k = await login('Kartik');
     const row = await submit(k, 'Unrelated widget polishing');
     expect(row.suggested_owner_name).toBe('Kartik'); // fallback owner when nothing matches
-    expect(row.suggestion_reason).toMatch(/No one's expertise matches/);
+    expect(row.suggestion_reason).toMatch(/No available person's skills match/);
     const cands = row.suggestion_candidates as Array<{ name: string; score: number }>;
     expect(cands.length).toBeGreaterThan(1);
   });
@@ -400,7 +410,7 @@ describe('backlog workflow', () => {
     const row = await submit(s, 'dispatch');
     const { error } = await s.rpc('approve_backlog_item', { p_item: row.id });
     expect(error?.message).toMatch(/Only a manager/);
-    const { error: e2 } = await s.from('backlog_items').update({ status: 'Assigned', approval: 'Yes' } as never).eq('id', row.id);
+    const { error: e2 } = await s.from('backlog_items').update({ status: 'Converted to Task', approval: 'Yes' } as never).eq('id', row.id);
     expect(e2).not.toBeNull();
     const { error: e3 } = await s.from('backlog_items').update({ suggested_owner_id: ids.Shruti } as never).eq('id', row.id);
     expect(e3).not.toBeNull();
@@ -421,7 +431,11 @@ describe('backlog workflow', () => {
     const count = await db.query('select count(*)::int as n from public.tasks where backlog_item_id = $1', [row.id]);
     expect(count.rows[0].n).toBe(1);
     const { data: b } = await k.from('backlog_board').select('*').eq('id', row.id).single();
-    expect(b).toMatchObject({ status: 'Assigned', approval: 'Yes', final_owner_name: 'Sanket', overrode_suggestion: false });
+    expect(b).toMatchObject({ status: 'Converted to Task', approval: 'Yes', final_owner_name: 'Sanket', overrode_suggestion: false, decided_by_name: 'Kartik' });
+    expect(b.backlog_code).toMatch(/^BCK-1\d\d$/);
+    const { data: task } = await k.from('task_board').select('status, assigned_by_name, task_code').eq('backlog_item_id', row.id).single();
+    expect(task).toMatchObject({ status: 'To Do', assigned_by_name: 'Kartik' });
+    expect(task!.task_code).toMatch(/^TSK-\d{3}$/);
     // requester can track the resulting task; owner sees it too
     expect((await s.from('task_board').select('id, owner_name').eq('backlog_item_id', row.id)).data).toHaveLength(1);
     const sa = await login('Sanket');
@@ -437,7 +451,7 @@ describe('backlog workflow', () => {
     const { data: b } = await k.from('backlog_board').select('*').eq('id', row.id).single();
     expect(b).toMatchObject({ final_owner_name: 'Dev', overrode_suggestion: true, decision_note: 'Sanket is busy', task_id: taskId });
     const { data: audit } = await k.from('audit_events').select('action').eq('entity_id', row.id);
-    expect(audit!.map((a) => a.action)).toEqual(expect.arrayContaining(['submitted', 'approved']));
+    expect(audit!.map((a) => a.action)).toEqual(expect.arrayContaining(['submitted', 'approved', 'converted']));
   });
 
   it('decided backlog rows are frozen for members', async () => {
@@ -456,13 +470,13 @@ describe('routines', () => {
     return r.rows[0];
   }
 
-  it('members see only their routines (supervisor also sees reports\')', async () => {
+  it('members see only their own routines (no supervisor visibility)', async () => {
     const z = await login('Zinia');
     const { data } = await z.from('routine_board').select('title, owner_name');
     expect(data!.every((r) => r.owner_name === 'Zinia')).toBe(true);
     const sa = await login('Sanket');
     const { data: sd } = await sa.from('routine_board').select('owner_name');
-    expect(new Set(sd!.map((r) => r.owner_name))).toEqual(new Set(['Sanket', 'Dev']));
+    expect(new Set(sd!.map((r) => r.owner_name))).toEqual(new Set(['Sanket']));
   });
 
   it('marking done sets Last Done / Next Due and refuses a second completion in the same cycle', async () => {
@@ -503,10 +517,12 @@ describe('routines', () => {
     expect(error?.message).toMatch(/not found/);
   });
 
-  it('weekly/monthly intervals are enforced by constraint', async () => {
+  it('Daily/Weekly/Monthly intervals are fixed at 1/7/30 days; only managers create routines', async () => {
     const k = await login('Kartik');
-    const { error } = await k.from('routines').insert({ title: 'bad', owner_id: ids.Dev, frequency: 'Monthly', every_n_days: 3 });
-    expect(error).not.toBeNull();
+    const { data: monthly, error } = await k.from('routines').insert({ title: 'Monthly thing', owner_id: ids.Dev, frequency: 'Monthly', every_n_days: 3 }).select().single();
+    expect(error).toBeNull();
+    expect(monthly!.every_n_days).toBe(30);
+    await db.query('delete from public.routines where id = $1', [monthly!.id]);
     const { data, error: e2 } = await k.from('routines').insert({ title: 'Every 3 days', owner_id: ids.Dev, frequency: 'Custom', every_n_days: 3 }).select().single();
     expect(e2).toBeNull();
     await db.query('delete from public.routines where id = $1', [data!.id]);

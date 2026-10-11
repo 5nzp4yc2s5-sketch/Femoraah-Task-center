@@ -57,12 +57,16 @@ export async function login(name: string): Promise<SupabaseClient> {
 export async function resetData(): Promise<void> {
   await db.query(`
     delete from public.task_collaborators; delete from public.task_updates; delete from public.task_assignments;
-    update public.backlog_items set task_id = null, status = 'Open', approval = 'Pending';
+    update public.backlog_items set task_id = null, status = 'Pending', approval = 'Pending';
     delete from public.tasks; delete from public.backlog_items;
+    delete from public.leaves; delete from public.holidays;
+    delete from public.attendance_flags; delete from public.attendance_corrections;
+    delete from public.attendance_sessions; delete from public.attendance_records;
     delete from public.routine_completions where note <> 'Imported from spreadsheet';
     delete from public.login_attempts; delete from public.verified_sessions;
     update public.member_pins set failed_attempts = 0, locked_until = null;
     update public.members set is_active = true, access_role = case when name = 'Kartik' then 'admin'::access_role else 'member'::access_role end;
     delete from public.members where name not in ('Zinia','Shruti','Sanket','Dev','Kartik');
+    update public.routines set backup_member_id = null where backup_member_id is not null;
   `);
 }
