@@ -57,6 +57,6 @@ TSK-### ids, Critical priority, To Do / Active / Blocked / Done; Blocked needs a
 Screens were also reviewed by eye at 1440 px and 390 px for every page (dashboard, Task Board, task detail, backlog, routines, calendar, attendance admin and self view, schedules, team, manager dashboard, help).
 
 ## Not covered by automated tests
-- Live site: checked after deploy through the Vercel deployment status and Supabase request/auth logs (this container cannot open *.vercel.app directly).
+- Live site: not yet updated. The live database needs migrations 006-008 run from the Supabase SQL Editor (DEPLOY.md §8) before `main` can be deployed; the combined file was run on a local copy of the 005 schema and produced exactly the same schema as a fresh migration run. After the deploy, checks go through the Vercel deployment status and Supabase request/auth logs (this container cannot open *.vercel.app directly).
 - Supabase Auth's own hosted per-IP sign-in limit.
 - There is no background job: sessions left open are marked Incomplete whenever someone signs in or an attendance page loads (verified in the DB tests by calling the same function).

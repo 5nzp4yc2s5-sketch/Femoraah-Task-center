@@ -71,3 +71,15 @@ Backups on Free: **Database → Backups** is not included, so run `npx supabase 
 5. Have them add a backlog item; approve it as Kartik; confirm exactly one task appears.
 6. Enter a wrong PIN five times in a private window → the account locks until you reset that PIN on the Team page.
 7. **Attendance → Schedules**: everyone starts on 10:00-19:00, Monday to Saturday, 10 minutes' grace. Set each person's real hours (they apply from the day you choose). Then sign in as a teammate and check that **Attendance** shows their sign-in time and only their own records.
+
+## 8. Updating a live database that already has migrations 001-005
+
+The 12-Oct-2026 features (Team Calendar, Delegated by / Assigned to, blockers, backlog approve/convert, attendance) need migrations 006-008. Build one file and run it once in **SQL Editor → New query → Run**:
+
+```sh
+cd supabase/migrations
+{ echo 'begin;'; cat 20261012000006_vocabulary.sql; echo 'commit;'; echo 'begin;'
+  cat 20261012000007_features.sql 20261012000008_attendance.sql; echo 'commit;'; } > ../../live-update.sql
+```
+
+The first transaction renames the status words (Postgres has to save new enum values before they can be used); the second adds everything else and is all-or-nothing. If the editor warns about destructive operations, that is the `drop function` / `drop view` / `drop policy` lines that replace objects with new versions; no table or row is dropped. Merge to `main` straight after, because the old app code still uses the old status names.
