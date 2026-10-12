@@ -276,7 +276,9 @@ begin
                                where iv.z is not null) g1) g2
                group by g2.grp) g3;
 
-      first_login := agg.first_login; last_logout := agg.last_logout;
+      -- While someone is still signed in, the day has no logout yet (an earlier break is not "the" logout).
+      first_login := agg.first_login;
+      last_logout := case when agg.any_open then null else agg.last_logout end;
       session_count := coalesce(agg.n, 0); open_session := agg.any_open;
       incomplete_sessions := coalesce(agg.n_incomplete, 0); corrected := agg.any_corrected;
       worked_minutes := floor(v_worked)::int;
@@ -333,7 +335,10 @@ begin
                      r.minutes_late, to_char(r.scheduled_start at time zone r.tz, 'HH24:MI'), r.grace_minutes))
       on conflict (member_id, work_date, flag_type) do nothing;
     end if;
-    if r.logout_status = 'Left Early' then
+    -- Early logout is only judged once the scheduled end has passed: signing out for lunch and
+    -- coming back is not leaving early.
+    if r.logout_status = 'Left Early'
+       and (r.work_date < (now() at time zone r.tz)::date or now() >= r.scheduled_end) then
       insert into public.attendance_flags (member_id, work_date, flag_type, expected_at, actual_at, minutes, reason)
       values (r.member_id, r.work_date, 'Early Logout', r.scheduled_end, r.last_logout, r.minutes_early,
               format('Signed out %s min before the scheduled end of %s.',

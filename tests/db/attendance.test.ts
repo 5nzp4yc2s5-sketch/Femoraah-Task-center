@@ -276,6 +276,11 @@ describe('attendance acceptance tests', () => {
     const rows = (await db.query('select logout_at from public.attendance_sessions where member_id = $1 order by login_at', [ids.Zinia])).rows;
     expect(rows).toHaveLength(2);
     expect(rows[0].logout_at.getTime()).toBe(closed.getTime());
+    // signing out before the scheduled end is not flagged until the end has passed (it may be a break)
+    await k.rpc('attendance_refresh', { p_from: today, p_to: today });
+    const beforeEnd = (await db.query("select now() < (private.today() + time '19:00') at time zone 'Asia/Kolkata' as b")).rows[0].b;
+    const early = (await db.query("select count(*)::int n from public.attendance_flags where member_id = $1 and flag_type = 'Early Logout' and work_date = $2", [ids.Zinia, today])).rows[0].n;
+    expect(early).toBe(beforeEnd ? 0 : 1);
   });
 });
 

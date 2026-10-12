@@ -60,6 +60,11 @@ export function StatusSelect({ id, status, blocker }: { id: string; status: Task
         {STATUSES.map((s) => <option key={s}>{s}</option>)}
       </select>
       {state?.error && !asking && <p className="mt-1 max-w-48 text-xs text-red-700">{state.error}</p>}
+      {state?.ok && !pending && (
+        <span role="status" className="ml-1 text-xs text-green-700">
+          Saved
+        </span>
+      )}
       <dialog
         ref={dialog}
         onClose={() => setAsking(false)}

@@ -23,7 +23,7 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
   q = sp.archived === '1' ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
   const scope = sp.scope ?? 'all';
   if (scope === 'mine') q = q.eq('owner_id', me.memberId);
-  if (scope === 'assigned') q = q.or(`created_by.eq.${me.memberId},assigned_by.eq.${me.memberId}`).neq('owner_id', me.memberId);
+  if (scope === 'assigned') q = q.eq('assigned_by', me.memberId).neq('owner_id', me.memberId);
   if (sp.owner && UUID.test(sp.owner)) q = q.eq('owner_id', sp.owner);
   if (sp.delegated && UUID.test(sp.delegated)) q = q.eq('assigned_by', sp.delegated);
   if (sp.priority && (PRIORITIES as readonly string[]).includes(sp.priority)) q = q.eq('priority', sp.priority);
@@ -76,11 +76,11 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
         <input type="hidden" name="scope" value={scope} />
         <input name="q" defaultValue={sp.q} placeholder="Search title or ID (TSK-012)…" className="input col-span-2 lg:col-span-2" aria-label="Search" />
         <select name="owner" defaultValue={sp.owner ?? ''} className="input" aria-label="Assigned to">
-          <option value="">Assigned to: anyone</option>
+          <option value="">All assignees</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
         <select name="delegated" defaultValue={sp.delegated ?? ''} className="input" aria-label="Delegated by">
-          <option value="">Delegated by: anyone</option>
+          <option value="">All delegators</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
         <select name="priority" defaultValue={sp.priority ?? ''} className="input" aria-label="Priority">
@@ -102,14 +102,12 @@ export default async function TaskBoard({ searchParams }: { searchParams: Promis
           <option value="week">Due in next 7 days</option>
           <option value="none">No due date</option>
         </select>
-        <label className="flex items-center gap-1.5 text-sm text-slate-700">
-          <span className="shrink-0 text-xs text-slate-500">Due from</span>
-          <input type="date" name="from" defaultValue={isIsoDate(sp.from) ? sp.from : ''} className="input" aria-label="Due from" />
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-slate-700">
+        <div className="col-span-2 flex items-center gap-1.5">
+          <span className="shrink-0 text-xs text-slate-500">Due</span>
+          <input type="date" name="from" defaultValue={isIsoDate(sp.from) ? sp.from : ''} className="input min-w-0 flex-1" aria-label="Due from" />
           <span className="shrink-0 text-xs text-slate-500">to</span>
-          <input type="date" name="to" defaultValue={isIsoDate(sp.to) ? sp.to : ''} className="input" aria-label="Due to" />
-        </label>
+          <input type="date" name="to" defaultValue={isIsoDate(sp.to) ? sp.to : ''} className="input min-w-0 flex-1" aria-label="Due to" />
+        </div>
         <select name="sort" defaultValue={sp.sort ?? 'flag'} className="input" aria-label="Sort">
           <option value="flag">Sort: urgency</option>
           <option value="due">Sort: due date</option>

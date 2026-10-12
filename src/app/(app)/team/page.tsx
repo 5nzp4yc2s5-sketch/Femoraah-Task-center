@@ -165,15 +165,14 @@ export default async function Team({ searchParams }: { searchParams: Promise<{ s
                 <tr>
                   <th>Name</th>
                   <th>Role</th>
-                  <th>Expertise / Skills</th>
-                  <th>Email</th>
-                  <th className="text-center">Max Open Tasks</th>
                   <th>Status</th>
-                  <th className="text-center">Open Tasks</th>
+                  <th>Capacity</th>
+                  <th className="text-center">Open / Max</th>
                   <th className="text-center">Overdue</th>
                   <th className="text-center">Blocked</th>
                   <th className="text-center">Overdue Routines</th>
-                  <th>Capacity</th>
+                  <th>Expertise / Skills</th>
+                  <th>Email</th>
                   {me.isAdmin && <th>Login</th>}
                 </tr>
               </thead>
@@ -188,15 +187,17 @@ export default async function Team({ searchParams }: { searchParams: Promise<{ s
                       {roleTag(m)}
                     </td>
                     <td className="whitespace-nowrap">{m.role_title}</td>
-                    <td className="min-w-72 max-w-md text-slate-600">{m.expertise}</td>
-                    <td className="whitespace-nowrap">{m.email ?? <span className="text-slate-400">—</span>}</td>
-                    <td className="text-center tabular-nums">{m.max_open_tasks}</td>
                     <td className="whitespace-nowrap">{status(m)}</td>
-                    <td className="text-center">{count(m.open_tasks, '', tasksHref(m))}</td>
+                    <td><CapacityBadge status={m.capacity_status} /></td>
+                    <td className="whitespace-nowrap text-center tabular-nums">
+                      {count(m.open_tasks, '', tasksHref(m))}
+                      <span className="text-xs text-slate-400">/{m.max_open_tasks}</span>
+                    </td>
                     <td className="text-center">{count(m.overdue, 'font-semibold text-red-700', tasksHref(m, '&due=overdue'))}</td>
                     <td className="text-center">{count(m.blocked, 'font-semibold text-orange-700', tasksHref(m, '&status=Blocked'))}</td>
                     <td className="text-center">{count(m.routine_overdue, 'font-semibold text-red-700', routinesHref(m))}</td>
-                    <td><CapacityBadge status={m.capacity_status} /></td>
+                    <td className="min-w-56 max-w-sm text-slate-600">{m.expertise}</td>
+                    <td className="whitespace-nowrap">{m.email ?? <span className="text-slate-400">—</span>}</td>
                     {me.isAdmin && <td className="whitespace-nowrap text-xs">{m.has_login ? m.username : <span className="text-amber-700">No login</span>}</td>}
                   </tr>
                 ))}

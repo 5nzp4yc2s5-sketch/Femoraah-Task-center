@@ -97,7 +97,7 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
             ? 'Review the suggested assignee, then approve to move the task to the Task Board. Suggestions are made by rules: skills, workload, overdue, blocked and availability.'
             : 'Unassigned work. A manager approves who takes it. Suggestions are made by rules: skills, workload, overdue, blocked and availability.'
         }
-        actions={<Link href="/backlog/new" className="btn-primary">Add to backlog</Link>}
+        actions={<Link href="/backlog/new" className="btn-primary whitespace-nowrap">Add to backlog</Link>}
       />
       <div className="mb-3 flex flex-wrap gap-1">
         {TABS.map((t) => (
@@ -127,7 +127,7 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
         error ? null : hasFilters ? (
           <EmptyState title="No backlog items match" body="Try another title, BCK ID or priority." action={<Link href={clearHref} className="btn-secondary">Clear filters</Link>} />
         ) : tab.key === 'pending' ? (
-          <EmptyState title="The backlog is clear" body="New work nobody owns yet goes here, not on the Task Board." action={<Link href="/backlog/new" className="btn-primary">Add to backlog</Link>} />
+          <EmptyState title="The backlog is clear" body="New work nobody owns yet goes here, not on the Task Board." action={<Link href="/backlog/new" className="btn-primary whitespace-nowrap">Add to backlog</Link>} />
         ) : (
           <EmptyState title={tab.key === 'all' ? 'No backlog items yet' : `No ${tab.label.toLowerCase()} items`} />
         )

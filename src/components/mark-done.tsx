@@ -10,7 +10,7 @@ export function MarkDone({ routineId, today, doneThisCycle }: { routineId: strin
   const [state, action] = useActionState(completeRoutineAction, undefined);
   const [pickDate, setPickDate] = useState(false);
   if (doneThisCycle) {
-    return <span className="text-xs font-medium text-green-700">{state?.ok ?? 'Done this cycle ✓'}</span>;
+    return <span className="whitespace-nowrap text-xs font-medium text-green-700">{state?.ok ?? 'Done this cycle ✓'}</span>;
   }
   return (
     <form action={action} className="inline-flex flex-wrap items-center justify-end gap-1.5">
@@ -23,12 +23,12 @@ export function MarkDone({ routineId, today, doneThisCycle }: { routineId: strin
       ) : (
         <>
           <input type="hidden" name="done_on" value={today ?? ''} />
-          <button type="button" className="text-xs text-slate-500 underline-offset-2 hover:underline" onClick={() => setPickDate(true)}>
+          <button type="button" className="whitespace-nowrap text-xs text-slate-500 underline-offset-2 hover:underline" onClick={() => setPickDate(true)}>
             other date
           </button>
         </>
       )}
-      <SubmitButton className="btn-primary px-2.5 py-1 text-xs" pendingText="…">Mark done</SubmitButton>
+      <SubmitButton className="btn-primary whitespace-nowrap px-2.5 py-1 text-xs" pendingText="…">Mark done</SubmitButton>
       {state?.error && <span role="alert" className="basis-full text-right text-xs text-red-700">{state.error}</span>}
       {state?.ok && <span role="status" className="basis-full text-right text-xs text-green-700">{state.ok}</span>}
     </form>

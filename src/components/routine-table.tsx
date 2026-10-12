@@ -124,7 +124,7 @@ export function RoutineTable({
                 <td className="whitespace-nowrap tabular-nums">{fmtDate(r.next_due)}</td>
                 <td><RoutineStatusBadge status={r.status} /></td>
                 <td className="max-w-56 text-slate-600"><span className="line-clamp-2">{r.notes || '—'}</span></td>
-                <td className="text-right">
+                <td className="min-w-44 text-right">
                   {canComplete(r) && r.is_active ? <MarkDone routineId={r.id} today={today} doneThisCycle={r.status === 'OK'} /> : <span className="text-xs text-slate-400">—</span>}
                 </td>
               </tr>

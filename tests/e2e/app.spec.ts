@@ -29,10 +29,18 @@ async function as(browser: Browser, who: Person, mobile = false) {
   return page;
 }
 
+// Dates in the workspace time zone (the app's "today"), not the test machine's.
 function isoIn(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+async function memberIdFromTeam(page: Page, name: string) {
+  await page.goto('/team');
+  const href = await page.getByRole('link', { name, exact: true }).first().getAttribute('href');
+  return href!.split('/').pop()!;
 }
 
 let taskUrl = '';
@@ -93,8 +101,8 @@ test('Shruti blocks her task with a reason, then unblocks it from the board', as
   await page.goto(taskUrl);
   await page.getByLabel('Status', { exact: true }).selectOption('Blocked');
   await page.getByLabel('% Complete').fill('30');
-  await expect(page.getByLabel(/Blocker reason/)).toBeVisible();
-  await page.getByLabel(/Blocker reason/).fill('Waiting for photos from the studio');
+  await expect(page.getByRole('textbox', { name: 'Blocker reason (required)' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Blocker reason (required)' }).fill('Waiting for photos from the studio');
   await page.getByRole('button', { name: 'Save progress' }).click();
   await expect(page.getByText('Progress saved.')).toBeVisible();
   await expect(page.getByText(/Edit task, reassign/)).toHaveCount(0); // the assignee cannot edit core fields
@@ -107,7 +115,7 @@ test('Shruti blocks her task with a reason, then unblocks it from the board', as
   const row = page.getByRole('row', { name: /Update Myntra listing photos/ });
   await expect(row).toContainText('Blocked: Waiting for photos from the studio');
   await row.getByLabel('Change status').selectOption('Active');
-  await expect(row.getByLabel('Change status')).toHaveValue('Active');
+  await expect(row.getByRole('status')).toHaveText('Saved');
   await page.reload();
   await expect(page.getByRole('row', { name: /Update Myntra listing photos/ })).not.toContainText('Waiting for photos');
   await page.goto(taskUrl);
@@ -117,6 +125,8 @@ test('Shruti blocks her task with a reason, then unblocks it from the board', as
   await page.getByRole('row', { name: /Update Myntra listing photos/ }).getByLabel('Change status').selectOption('Blocked');
   await page.getByRole('dialog').getByLabel('Blocker reason').fill('Studio closed until Monday');
   await page.getByRole('dialog').getByRole('button', { name: 'Mark Blocked' }).click();
+  await expect(page.getByRole('row', { name: /Update Myntra listing photos/ }).getByRole('status')).toHaveText('Saved');
+  await page.reload();
   await expect(page.getByRole('row', { name: /Update Myntra listing photos/ })).toContainText('Studio closed until Monday');
 });
 
@@ -156,7 +166,7 @@ test('manager approves with an override; the backlog row is kept as Converted to
   await page.getByRole('button', { name: 'Convert to task' }).click();
   await page.waitForURL(/\/tasks\/[0-9a-f-]+\?created=1/);
   await expect(page.getByText('Task created and assigned to Dev.')).toBeVisible();
-  await expect(page.getByText('To Do').first()).toBeVisible();
+  await expect(page.getByLabel('Change status')).toHaveValue('To Do');
   await page.goto(backlogUrl);
   await expect(page.getByText(/overrode suggestion: Sanket/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve and create task' })).toHaveCount(0);
@@ -175,6 +185,128 @@ test('Dev ticks off a routine once per cycle', async ({ browser }) => {
   await page.reload();
   await expect(page.getByRole('row', { name: /Pack orders/ }).getByText('Done this cycle ✓')).toBeVisible();
   await expect(page.getByRole('row', { name: /Update hold sheet/ })).toHaveCount(0); // Sanket's routine, not Dev's
+});
+
+test('Team Calendar: admin records leave with a backup and a holiday; the backup covers the routine', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+  // a routine for Dev with Zinia as backup
+  await admin.goto('/routines/new');
+  await admin.getByLabel('Routine Task').fill('Restock packing tape');
+  await admin.getByLabel('Assigned to').selectOption({ label: 'Dev' });
+  await admin.getByLabel('Backup (optional)').selectOption({ label: 'Zinia' });
+  await admin.getByLabel('Frequency').selectOption('Weekly');
+  await admin.getByRole('button', { name: 'Create routine' }).click();
+  await expect(admin.getByText(/RTN-\d{3}/).filter({ visible: true }).first()).toBeVisible();
+
+  await admin.goto('/calendar');
+  await expect(admin.getByRole('heading', { name: 'Team Calendar' })).toBeVisible();
+  await admin.getByLabel('Person').selectOption({ label: 'Dev' });
+  await admin.getByLabel('Leave type').selectOption('Sick Leave');
+  await admin.getByLabel('First day').fill(isoIn(0));
+  await admin.getByLabel('Last day').fill(isoIn(1));
+  await admin.getByLabel('Backup (optional)').selectOption({ label: 'Zinia' });
+  await admin.getByRole('button', { name: 'Add leave' }).click();
+  await expect(admin.getByText(/Leave added: Sick Leave/)).toBeVisible();
+  // overlapping leave is refused
+  await admin.getByLabel('Person').selectOption({ label: 'Dev' });
+  await admin.getByLabel('Leave type').selectOption('Casual Leave');
+  await admin.getByLabel('First day').fill(isoIn(1));
+  await admin.getByLabel('Last day').fill(isoIn(1));
+  await admin.getByRole('button', { name: 'Add leave' }).click();
+  await expect(admin.getByText(/overlaps another leave/)).toBeVisible();
+  await admin.getByLabel('Date', { exact: true }).fill(isoIn(10));
+  await admin.getByLabel('Holiday', { exact: true }).fill('Founders Day');
+  await admin.getByRole('button', { name: 'Add holiday' }).click();
+  await expect(admin.getByText('Founders Day').first()).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/11-calendar.png`, fullPage: true });
+  await admin.goto('/team');
+  await expect(admin.getByText('On Leave').filter({ visible: true }).first()).toBeVisible();
+
+  // Shruti sees that Dev is away but not why, and cannot add holidays
+  const shruti = await as(browser, PEOPLE.Shruti);
+  await shruti.goto('/calendar');
+  await expect(shruti.getByText(/Dev/).filter({ visible: true }).first()).toBeVisible();
+  await expect(shruti.getByText('Sick Leave').filter({ visible: true })).toHaveCount(0); // the type is private
+  await expect(shruti.getByRole('button', { name: 'Add holiday' })).toHaveCount(0);
+
+  // Zinia covers Dev's routine while he is away; ownership stays with Dev
+  const zinia = await as(browser, PEOPLE.Zinia);
+  await zinia.goto('/routines');
+  const row = zinia.getByRole('row', { name: /Restock packing tape/ });
+  await expect(row).toContainText('covering while Dev is on leave');
+  await row.getByRole('button', { name: 'Mark done' }).click();
+  await expect(row.getByText(/Logged\. Next due/)).toBeVisible();
+  await admin.goto('/routines');
+  await admin.getByRole('row', { name: /Restock packing tape/ }).getByRole('link', { name: /Restock packing tape/ }).click();
+  await expect(admin.getByText(/covering for Dev/).filter({ visible: true }).first()).toBeVisible();
+});
+
+test('Attendance: sign-in is recorded, people see only their own, corrections need the admin', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+  const devId = await memberIdFromTeam(admin, 'Dev');
+  const shrutiId = await memberIdFromTeam(admin, 'Shruti');
+
+  const shruti = await as(browser, PEOPLE.Shruti);
+  await shruti.goto('/attendance');
+  await expect(shruti.getByRole('heading', { name: 'My attendance' })).toBeVisible();
+  await expect(shruti.getByText('Currently Working').first()).toBeVisible();
+  await expect(shruti.getByText(/No keystrokes, screenshots, webcam/i).first()).toBeVisible();
+  // someone else's attendance is refused, in the page and in the export
+  const other = await shruti.request.get(`/attendance/export?member=${devId}`);
+  expect(other.status()).toBe(403);
+  const own = await shruti.request.get('/attendance/export');
+  expect(own.status()).toBe(200);
+  expect((await own.text()).split(/\r?\n/)[0]).toBe(
+    'Employee,Date,Scheduled Start,Actual Login,Login Status,Minutes Late,Scheduled End,Actual Logout,Logout Status,Minutes Early,Overtime Minutes,Hours Worked,Sessions,Incomplete Sessions,Corrected,Open Flags',
+  );
+  await expect(shruti.getByRole('link', { name: 'Schedules' })).toHaveCount(0);
+  await shruti.goto('/attendance/schedules');
+  await expect(shruti).toHaveURL(/error=admins-only/);
+
+  // a correction request for yesterday
+  await shruti.goto('/attendance');
+  await shruti.getByLabel('Date', { exact: true }).fill(isoIn(-1));
+  await shruti.getByLabel('Correct login time').fill('10:00');
+  await shruti.getByLabel('Correct logout time').fill('19:00');
+  await shruti.getByLabel('Reason').fill('Worked from the warehouse without the app');
+  await shruti.getByRole('button', { name: 'Request correction' }).click();
+  await expect(shruti.locator('[role=status]').first()).toBeVisible();
+  await shruti.screenshot({ path: `${SHOTS}/12-my-attendance.png`, fullPage: true });
+
+  // the admin sees everyone, approves the request, and changes a schedule from today
+  await admin.goto('/attendance');
+  await expect(admin.getByRole('heading', { name: 'Attendance', exact: true })).toBeVisible();
+  for (const h of ['Employee', 'Scheduled Start', 'Actual Login', 'Login Status', 'Scheduled End', 'Actual Logout', 'Logout Status', 'Hours Worked']) {
+    await expect(admin.getByRole('columnheader', { name: h, exact: true })).toBeVisible();
+  }
+  await expect(admin.locator('a > .card', { hasText: 'Currently working' })).not.toContainText(/^Currently working\s*0/);
+  await expect(admin.getByText('Worked from the warehouse without the app')).toBeVisible();
+  await admin.getByRole('button', { name: 'Approve' }).first().click();
+  await admin.getByRole('dialog').getByRole('button', { name: /Approve/ }).click();
+  await expect(admin.getByText('Correction requests (0 pending)')).toBeVisible({ timeout: 10_000 });
+  await admin.screenshot({ path: `${SHOTS}/13-attendance-admin.png`, fullPage: true });
+  const csv = await admin.request.get(`/attendance/export?from=${isoIn(-1)}&to=${isoIn(0)}`);
+  expect(csv.status()).toBe(200);
+  expect(csv.headers()['content-type']).toContain('text/csv');
+  expect(await csv.text()).toContain('Shruti');
+
+  await admin.goto(`/attendance?from=${isoIn(-1)}&member=${shrutiId}`);
+  await expect(admin.getByText('Corrected').filter({ visible: true }).first()).toBeVisible();
+
+  await admin.goto('/attendance/schedules');
+  await expect(admin.getByText(/Days before that keep the schedule they had/)).toBeVisible();
+  await admin.getByLabel('Employee').selectOption({ label: 'Dev' });
+  await admin.getByLabel('Start time').fill('09:00');
+  await admin.getByLabel('End time').fill('18:00');
+  await admin.getByRole('button', { name: 'Save schedule' }).click();
+  await expect(admin.getByText(/Schedule saved\. It applies from the chosen date/)).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/14-schedules.png`, fullPage: true });
+
+  // signing out records the logout
+  await shruti.getByRole('button', { name: 'Sign out' }).click();
+  await shruti.waitForURL(/\/login/);
+  await admin.goto(`/attendance?member=${shrutiId}`);
+  await expect(admin.getByText(/Left Early|Logged Out|Overtime/).filter({ visible: true }).first()).toBeVisible();
 });
 
 test('manager dashboard reflects the changes', async ({ browser }) => {

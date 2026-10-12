@@ -84,7 +84,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
   const mine = all.filter((t) => t.owner_id === me.memberId);
   const myOpen = sortTasks(mine.filter((t) => t.status !== 'Done'));
   const upcoming = sortTasks(myOpen.filter((t) => t.days_left !== null && t.days_left >= 0 && t.days_left <= 7), 'due');
-  const delegated = sortTasks(all.filter((t) => t.owner_id !== me.memberId && (t.created_by === me.memberId || t.assigned_by === me.memberId)));
+  const delegated = sortTasks(all.filter((t) => t.owner_id !== me.memberId && t.assigned_by === me.memberId));
   const recent = all.filter((t) => t.owner_id === me.memberId || t.created_by === me.memberId || t.assigned_by === me.memberId).slice(0, 8);
   const myRoutines = routines.filter((r) => r.owner_id === me.memberId);
   const covering = (coveringData ?? []) as RoutineRow[];
@@ -246,7 +246,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
       </div>
 
       <SectionTitle action={<Link href="/tasks?scope=assigned" className="text-sm text-navy-700 hover:underline">All →</Link>}>Tasks I delegated to others</SectionTitle>
-      <TaskTable rows={delegated} compact empty={{ title: 'You have not delegated any open tasks', body: 'Tasks you create for teammates stay visible here so you can track them.' }} />
+      <TaskTable rows={delegated} compact empty={{ title: 'You have not delegated any open tasks', body: 'Tasks where you are Delegated by stay visible here so you can track them.' }} />
 
       <SectionTitle>Recent changes</SectionTitle>
       {activityError ? (
