@@ -102,6 +102,9 @@ const attendanceStyles: Record<string, string> = {
   Pending: 'bg-blue-50 text-blue-800 ring-blue-200',
   Approved: 'bg-green-100 text-green-800 ring-green-300',
   Rejected: 'bg-slate-200 text-slate-700 ring-slate-300',
+  Waived: 'bg-slate-100 text-slate-700 ring-slate-300',
+  Exempt: 'bg-sky-50 text-sky-800 ring-sky-200',
+  'On Break': 'bg-amber-50 text-amber-900 ring-amber-200',
 };
 
 export function AttendanceBadge({ status }: { status: string | null }) {

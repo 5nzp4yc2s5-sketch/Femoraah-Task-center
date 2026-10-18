@@ -257,7 +257,7 @@ test('Attendance: sign-in is recorded, people see only their own, corrections ne
   const own = await shruti.request.get('/attendance/export');
   expect(own.status()).toBe(200);
   expect((await own.text()).split(/\r?\n/)[0]).toBe(
-    'Employee,Date,Scheduled Start,Actual Login,Login Status,Minutes Late,Scheduled End,Actual Logout,Logout Status,Minutes Early,Overtime Minutes,Hours Worked,Sessions,Incomplete Sessions,Corrected,Open Flags',
+    'Employee,Date,Scheduled Start,Actual Login,Login Status,Minutes Late,Scheduled End,Actual Logout,Logout Status,Minutes Early,Overtime Minutes,Hours Worked,Sessions,Incomplete Sessions,Corrected,Open Flags,Break Minutes,Exempt,Team',
   );
   await expect(shruti.getByRole('link', { name: 'Schedules' })).toHaveCount(0);
   await shruti.goto('/attendance/schedules');
@@ -380,4 +380,77 @@ test('deactivating a member cuts off their open session', async ({ browser }) =>
   await admin.getByRole('button', { name: 'Reactivate member' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Reactivate' }).click();
   await expect(admin.getByRole('button', { name: 'Deactivate member' })).toBeVisible();
+});
+
+test('Attendance phase 2: teams and default hours, breaks, the exception queue and exemptions', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+
+  // Teams and default hours (weekly offs are the unticked days)
+  await admin.goto('/settings');
+  await expect(admin.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await admin.getByLabel('New team').fill('Warehouse');
+  await admin.getByRole('button', { name: 'Add team' }).click();
+  await expect(admin.getByText('Team added.')).toBeVisible();
+  await admin.getByLabel('Start time').fill('09:30');
+  await admin.getByRole('button', { name: 'Save default hours' }).click();
+  await expect(admin.getByText(/Default hours saved/)).toBeVisible();
+  await admin.locator('#mt-member').selectOption({ label: 'Zinia' });
+  await admin.locator('#mt-team').selectOption({ label: 'Warehouse' });
+  await admin.getByRole('button', { name: 'Save team' }).click();
+  await expect(admin.getByText(/Team saved\. It applies from the chosen date/)).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByRole('row', { name: /Zinia/ }).getByText('Warehouse')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/15-settings.png`, fullPage: true });
+
+  // Breaks from My Dashboard
+  const zinia = await as(browser, PEOPLE.Zinia);
+  await zinia.getByRole('button', { name: 'Start break' }).click();
+  await expect(zinia.getByRole('button', { name: 'End break' })).toBeVisible({ timeout: 10_000 });
+  await expect(zinia.getByText(/On a break since/)).toBeVisible();
+  await zinia.screenshot({ path: `${SHOTS}/16-break-running.png`, fullPage: true });
+  await zinia.getByRole('button', { name: 'End break' }).click();
+  await expect(zinia.getByRole('button', { name: 'Start break' })).toBeVisible({ timeout: 10_000 });
+  await expect(zinia.getByText(/Breaks today: /)).toBeVisible();
+
+  // Two late logins yesterday to decide (inserted directly: real ones depend on the time of day)
+  const pg = (await import('pg')).default;
+  const db = new pg.Client({ connectionString: process.env.TEST_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' });
+  await db.connect();
+  await db.query(
+    `insert into public.attendance_flags (member_id, work_date, flag_type, minutes, reason)
+     select id, private.today() - 1, 'Late Login', 25, 'Signed in 25 min after the scheduled start of 10:00 (grace period 10 min).'
+     from public.members where name in ('Dev', 'Shruti')
+     on conflict do nothing`,
+  );
+  await db.end();
+  await admin.goto(`/attendance/exceptions?type=Late+Login&from=${isoIn(-1)}&to=${isoIn(-1)}`);
+  await expect(admin.getByRole('heading', { name: 'Attendance exceptions' })).toBeVisible();
+  await admin.getByLabel(/Select all open/).check();
+  await admin.getByLabel('Note (optional, saved with the decision)').fill('Road closure confirmed');
+  await admin.screenshot({ path: `${SHOTS}/17-exception-queue.png`, fullPage: true });
+  await admin.getByRole('button', { name: /^Approve \d+$/ }).click();
+  await expect(admin.getByText(/^2 exceptions approved\./)).toBeVisible({ timeout: 10_000 });
+  await admin.goto(`/attendance/exceptions?type=Late+Login&status=Approved&from=${isoIn(-1)}&to=${isoIn(-1)}`);
+  await expect(admin.getByText('Approved by Kartik').first()).toBeVisible();
+  await admin.getByText(/History \(1\)/).first().click();
+  await expect(admin.getByText(/Approved by Kartik · “Road closure confirmed”/).first()).toBeVisible();
+
+  // Exemptions
+  await admin.goto('/attendance/exemptions');
+  await admin.getByLabel('Employee').selectOption({ label: 'Shruti' });
+  await admin.getByLabel('Reason').fill('Field visits, flexible hours agreed');
+  await admin.getByRole('button', { name: 'Add exemption' }).click();
+  await expect(admin.getByText(/Permanent exemption added/)).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByText('Field visits, flexible hours agreed')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/18-exemptions.png`, fullPage: true });
+
+  // The attendance sheet shows breaks; employees cannot open the admin pages
+  await admin.goto('/attendance');
+  await expect(admin.getByRole('columnheader', { name: 'Breaks', exact: true })).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/19-attendance-admin-breaks.png`, fullPage: true });
+  for (const path of ['/settings', '/attendance/exceptions', '/attendance/exemptions']) {
+    await zinia.goto(path);
+    await expect(zinia).toHaveURL(/error=admins-only/);
+  }
 });

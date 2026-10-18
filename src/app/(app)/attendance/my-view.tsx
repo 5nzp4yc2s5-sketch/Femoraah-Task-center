@@ -5,9 +5,10 @@ import type { Me } from '@/lib/session';
 import { AttendanceBadge } from '@/components/badges';
 import { Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { requestCorrectionAction } from './actions';
+import { addBreakAction, requestCorrectionAction } from './actions';
 import { AttendanceTable, CorrectionList, FlagList, HoursCell, LoginStatusCell, LogoutStatusCell, PrivacyNote, TimeZoneNote } from './parts';
-import { attendanceSettings, loadSchedules, memberNames, recordedTimes } from './data';
+import { BreakControl } from './break-control';
+import { attendanceSettings, loadDays, loadSchedules, memberNames, recordedTimes } from './data';
 import { DEFAULT_TZ, daysLabel, hhmm, scheduleOn, sortFlags, validDate, type CorrectionRow, type FlagRow } from './lib';
 
 const HISTORY_DAYS = 30;
@@ -20,7 +21,7 @@ export async function MyAttendance({ me, today, correct }: { me: Me; today: stri
 
   const refresh = await supabase.rpc('attendance_refresh', { p_from: from, p_to: today });
   const [report, flagRes, corrRes, schedules, names, settings] = await Promise.all([
-    supabase.rpc('attendance_report', { p_from: from, p_to: today }),
+    loadDays(supabase, from, today),
     supabase.from('attendance_flags').select('*').eq('member_id', me.memberId).order('work_date', { ascending: false }).limit(200),
     supabase.from('attendance_corrections').select('*').eq('member_id', me.memberId).order('created_at', { ascending: false }).limit(50),
     loadSchedules(supabase, me.memberId),
@@ -28,7 +29,7 @@ export async function MyAttendance({ me, today, correct }: { me: Me; today: stri
     attendanceSettings(supabase),
   ]);
 
-  const rows = ((report.data ?? []) as AttendanceRow[]).filter((r) => r.member_id === me.memberId);
+  const rows = report.rows.filter((r) => r.member_id === me.memberId);
   const todayRow = rows.find((r) => r.work_date === today) ?? null;
   const flags = sortFlags((flagRes.data ?? []) as FlagRow[]);
   const activeFlags = flags.filter((x) => x.status !== 'Resolved');
@@ -55,14 +56,47 @@ export async function MyAttendance({ me, today, correct }: { me: Me; today: stri
         subtitle="Your sign-in and sign-out times, judged against your schedule. This record is read-only; to fix a mistake, request a correction."
         actions={<a href={`/attendance/export?from=${from}&to=${today}`} className="btn-secondary">Download CSV</a>}
       />
-      {report.error && <Notice tone="error">Could not load your attendance: {friendlyError(report.error.message)}</Notice>}
+      {report.error && <Notice tone="error">Could not load your attendance: {friendlyError(report.error)}</Notice>}
       {refresh.error && !report.error && <Notice tone="warn">Your flags could not be brought up to date ({friendlyError(refresh.error.message)}).</Notice>}
 
-      <TodayCard row={todayRow} today={today} scheduleText={schedule ? `${hhmm(schedule.start_time)}–${hhmm(schedule.end_time)} · ${daysLabel(schedule.working_days)}` : null} graceText={schedule ? `Grace ${schedule.grace_minutes} min · break ${schedule.break_minutes} min · ${schedule.timezone}` : null} />
+      <TodayCard
+        row={todayRow}
+        today={today}
+        scheduleText={todayRow?.scheduled_start ? `${fmtClock(todayRow.scheduled_start, todayRow.tz)}–${fmtClock(todayRow.scheduled_end, todayRow.tz)}${schedule && !schedule.follows_default ? ` · ${daysLabel(schedule.working_days)}` : ''}` : schedule ? 'No hours today' : null}
+        graceText={todayRow?.scheduled_start ? `Grace ${todayRow.grace_minutes} min · break ${todayRow.break_minutes} min · ${todayRow.tz}${todayRow.schedule_source && todayRow.schedule_source !== 'Personal' ? ` · ${todayRow.schedule_source === 'Team' ? `${todayRow.team_name ?? 'team'} default` : 'company default'}` : ''}` : null}
+      />
+      {todayRow?.exempt && (
+        <p className="mt-2 text-xs text-sky-800">You are exempt from late, early and long-break flags today. Your times are still recorded.</p>
+      )}
       {upcoming.length > 0 && (
         <p className="mt-2 text-xs text-slate-600">
-          Schedule change from {fmtDate(upcoming[0].effective_from)}: {hhmm(upcoming[0].start_time)}–{hhmm(upcoming[0].end_time)} · {daysLabel(upcoming[0].working_days)}.
+          Schedule change from {fmtDate(upcoming[0].effective_from)}:{' '}
+          {upcoming[0].follows_default ? 'your team or company default hours' : `${hhmm(upcoming[0].start_time)}–${hhmm(upcoming[0].end_time)} · ${daysLabel(upcoming[0].working_days)}`}.
         </p>
+      )}
+      {todayRow?.first_login && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium text-navy-700">Forgot to press Break? Add a missed break for today</summary>
+          <ActionForm action={addBreakAction} resetOnSuccess className="card mt-2 grid gap-3 p-4 sm:grid-cols-4 sm:items-end">
+            <input type="hidden" name="work_date" value={today} />
+            <div>
+              <label className="label" htmlFor="mb-start">Break start</label>
+              <input id="mb-start" type="time" name="start_time" className="input" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="mb-end">Break end</label>
+              <input id="mb-end" type="time" name="end_time" className="input" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="mb-note">Note</label>
+              <input id="mb-note" name="note" className="input" maxLength={500} placeholder="Optional" />
+            </div>
+            <SubmitButton>Add break</SubmitButton>
+            <p className="text-xs text-slate-500 sm:col-span-4">
+              Office time ({todayRow.tz}). Only today, within your signed-in time. For an earlier day, ask the admin.
+            </p>
+          </ActionForm>
+        </details>
       )}
 
       <SectionTitle>Last {HISTORY_DAYS} days</SectionTitle>
@@ -86,12 +120,12 @@ export async function MyAttendance({ me, today, correct }: { me: Me; today: stri
           A flag asks the admin to check a day; it is not a finding. Add an explanation so they have the full picture.
         </p>
         {flagRes.error && <Notice tone="error">Could not load your flags: {friendlyError(flagRes.error.message)}</Notice>}
-        <FlagList flags={activeFlags} names={names} tzFor={tzFor} mode="self" empty={{ title: 'No flags', body: 'Nothing needs your attention.' }} />
+        <FlagList flags={activeFlags} names={names} tzFor={tzFor} empty={{ title: 'No flags', body: 'Nothing needs your attention.' }} />
         {resolvedFlags.length > 0 && (
           <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-medium text-navy-700">Resolved flags ({resolvedFlags.length})</summary>
+            <summary className="cursor-pointer text-sm font-medium text-navy-700">Decided flags ({resolvedFlags.length})</summary>
             <div className="mt-3">
-              <FlagList flags={resolvedFlags} names={names} tzFor={tzFor} mode="self" empty={{ title: 'No resolved flags' }} />
+              <FlagList flags={resolvedFlags} names={names} tzFor={tzFor} empty={{ title: 'No resolved flags' }} />
             </div>
           </details>
         )}
@@ -184,6 +218,18 @@ function TodayCard({ row, today, scheduleText, graceText }: { row: AttendanceRow
           {graceText && <dd className="text-xs text-slate-500">{graceText}</dd>}
         </div>
       </dl>
+      {row && (row.open_session || row.break_count > 0) && (
+        <div className="mt-4 border-t border-line pt-3">
+          <BreakControl
+            canBreak={row.open_session}
+            onBreak={row.on_break}
+            startedAt={row.break_started_at}
+            takenMinutes={row.break_taken_minutes}
+            allowance={row.day_type === 'Working Day' ? row.break_minutes : null}
+            tz={row.tz}
+          />
+        </div>
+      )}
     </section>
   );
 }

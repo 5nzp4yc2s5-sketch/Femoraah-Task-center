@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers } from '@/lib/data';
-import { addDays, fmtDate, friendlyError } from '@/lib/format';
+import { addDays, fmtClock, fmtDate, fmtMinutes, friendlyError } from '@/lib/format';
 import type { AttendanceRow } from '@/lib/types';
-import { Notice, PageHeader, SectionTitle, StatCard } from '@/components/ui';
-import { AttendanceTable, CorrectionList, FlagList, PrivacyNote, TimeZoneNote } from './parts';
-import { attendanceSettings, loadSchedules, memberNames, recordedTimes } from './data';
+import { EmptyState, Notice, PageHeader, SectionTitle, StatCard } from '@/components/ui';
+import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
+import { AttendanceTable, CorrectionList, PrivacyNote, TimeZoneNote } from './parts';
+import { addBreakAction, voidBreakAction } from './actions';
+import { attendanceSettings, loadDays, loadSchedules, loadTeams, memberNames, recordedTimes } from './data';
 import {
   DEFAULT_TZ,
   LOGIN_STATUSES,
@@ -16,19 +18,28 @@ import {
   parseFilters,
   scheduleOn,
   scopeRows,
-  sortFlags,
   type AttendanceSearch,
   type CorrectionRow,
-  type FlagRow,
 } from './lib';
+
+interface BreakRow {
+  id: string;
+  member_id: string;
+  work_date: string;
+  source: 'app' | 'manual';
+  start_at: string;
+  end_at: string | null;
+  note: string;
+  entered_by: string | null;
+  closed_incomplete_at: string | null;
+}
 
 /** Days before today that are refreshed on every visit, so recent flags exist even when viewing one day. */
 const RECENT_DAYS = 14;
 
-export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { flags?: string }; today: string }) {
+export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch; today: string }) {
   const supabase = await createClient();
   const { filters: f, error: rangeError } = parseFilters(sp, today);
-  const showAllFlags = sp.flags === 'all';
 
   // Expire stale sessions and create flags before reading (idempotent). Sequential on purpose.
   const refreshErrors: string[] = [];
@@ -40,29 +51,33 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
     if (r2.error) refreshErrors.push(r2.error.message);
   }
 
-  let flagQuery = supabase.from('attendance_flags').select('*');
+  let flagQuery = supabase.from('attendance_flags').select('id', { count: 'exact', head: true }).neq('status', 'Resolved');
   if (f.member) flagQuery = flagQuery.eq('member_id', f.member);
-  if (!showAllFlags) flagQuery = flagQuery.eq('status', 'Open');
+  let breakQuery = supabase.from('attendance_breaks').select('*').is('voided_at', null).gte('work_date', f.from).lte('work_date', f.to);
+  if (f.member) breakQuery = breakQuery.eq('member_id', f.member);
   let pendingQuery = supabase.from('attendance_corrections').select('*').eq('status', 'Pending');
   if (f.member) pendingQuery = pendingQuery.eq('member_id', f.member);
   let decidedQuery = supabase.from('attendance_corrections').select('*').neq('status', 'Pending');
   if (f.member) decidedQuery = decidedQuery.eq('member_id', f.member);
 
-  const [report, flagRes, pendingRes, decidedRes, members, names, schedules, settings] = await Promise.all([
-    supabase.rpc('attendance_report', { p_from: f.from, p_to: f.to }),
-    flagQuery.order('work_date', { ascending: false }).order('created_at', { ascending: false }).limit(300),
+  const [report, flagRes, breakRes, pendingRes, decidedRes, members, names, schedules, settings, teams] = await Promise.all([
+    loadDays(supabase, f.from, f.to, { team: f.team }),
+    flagQuery,
+    breakQuery.order('start_at', { ascending: false }).limit(300),
     pendingQuery.order('work_date', { ascending: true }).order('created_at', { ascending: true }).limit(200),
     decidedQuery.order('decided_at', { ascending: false }).limit(10),
     activeMembers(),
     memberNames(supabase),
     loadSchedules(supabase),
     attendanceSettings(supabase),
+    loadTeams(supabase),
   ]);
 
-  const rows = (report.data ?? []) as AttendanceRow[];
+  const rows = report.rows;
   const scoped = scopeRows(rows, f);
   const shown = applyFilters(rows, f);
-  const flags = sortFlags((flagRes.data ?? []) as FlagRow[]);
+  const openExceptions = flagRes.count ?? 0;
+  const breaks = ((breakRes.data ?? []) as BreakRow[]).filter((b) => !f.team || rows.some((r) => r.member_id === b.member_id));
   const pending = (pendingRes.data ?? []) as CorrectionRow[];
   const decided = (decidedRes.data ?? []) as CorrectionRow[];
 
@@ -79,6 +94,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
   for (const r of rows) if (!options.has(r.member_id)) options.set(r.member_id, r.member_name);
   if (f.member && !options.has(f.member)) options.set(f.member, names.get(f.member) ?? 'Unknown member');
   const memberName = f.member ? options.get(f.member) : null;
+  const teamName = f.team ? teams.find((t) => t.id === f.team)?.name ?? 'Unknown team' : null;
 
   // Summary figures for the chosen period and employee (status filters below only narrow the table).
   const count = (p: (r: AttendanceRow) => boolean) => scoped.filter(p).length;
@@ -89,6 +105,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
   const notLogged = count((r) => r.login_status === 'Not Logged In');
   const leftEarly = count((r) => r.logout_status === 'Left Early');
   const incomplete = scoped.reduce((n, r) => n + r.incomplete_sessions, 0);
+  const onBreak = count((r) => r.on_break);
   const unit = f.isRange ? 'person-days' : 'people';
 
   const isToday = !f.isRange && f.from === today;
@@ -99,12 +116,8 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
   };
   const periodOnly = { status: null, late: false, early: false, incomplete: false, leave: false };
   const exportHref = `/attendance/export?${filterQuery(f, { to: f.to })}`;
-  const flagsToggle = (() => {
-    const s = filterQuery(f);
-    if (showAllFlags) return `${s ? `/attendance?${s}` : '/attendance'}#flags`;
-    return `/attendance?${s ? `${s}&` : ''}flags=all#flags`;
-  })();
-  const filtered = Boolean(f.member) || hasStatusFilters(f);
+  const filtered = Boolean(f.member) || Boolean(f.team) || hasStatusFilters(f);
+  const exceptionsHref = `/attendance/exceptions${f.member ? `?member=${f.member}` : ''}`;
 
   const quick = [
     { label: 'Today', from: today, to: null as string | null },
@@ -117,16 +130,18 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
     <>
       <PageHeader
         title="Attendance"
-        subtitle={`Sign-in and sign-out times for the team, judged against each person's schedule. Showing ${period}${memberName ? ` for ${memberName}` : ''}.`}
+        subtitle={`Sign-in and sign-out times for the team, judged against each person's schedule. Showing ${period}${memberName ? ` for ${memberName}` : ''}${teamName ? ` in ${teamName}` : ''}.`}
         actions={
           <>
+            <Link href="/attendance/exceptions" className="btn-primary">Exceptions{openExceptions ? ` (${openExceptions})` : ''}</Link>
+            <Link href="/attendance/exemptions" className="btn-secondary">Exemptions</Link>
             <Link href="/attendance/schedules" className="btn-secondary">Schedules</Link>
             <a href={exportHref} className="btn-secondary">Export CSV</a>
           </>
         }
       />
       {rangeError && <Notice tone="warn">{rangeError}</Notice>}
-      {report.error && <Notice tone="error">Could not load attendance: {friendlyError(report.error.message)}</Notice>}
+      {report.error && <Notice tone="error">Could not load attendance: {friendlyError(report.error)}</Notice>}
       {refreshErrors.length > 0 && !report.error && (
         <Notice tone="warn">Attendance flags could not be brought up to date ({friendlyError(refreshErrors[0])}). The figures below may miss the latest flags.</Notice>
       )}
@@ -162,14 +177,21 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
           <label className="label" htmlFor="f-to">To (optional)</label>
           <input id="f-to" type="date" name="to" defaultValue={f.isRange ? f.to : ''} max={today} className="input" />
         </div>
-        <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+        <div className="col-span-2 sm:col-span-1">
           <label className="label" htmlFor="f-member">Employee</label>
           <select id="f-member" name="member" defaultValue={f.member ?? ''} className="input">
             <option value="">Everyone</option>
             {Array.from(options.entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
         </div>
-        <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+        <div>
+          <label className="label" htmlFor="f-team">Team</label>
+          <select id="f-team" name="team" defaultValue={f.team ?? ''} className="input">
+            <option value="">All teams</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}{t.is_active ? '' : ' (archived)'}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
           <label className="label" htmlFor="f-status">Status</label>
           <select id="f-status" name="status" defaultValue={f.status ?? ''} className="input">
             <option value="">Any status</option>
@@ -195,7 +217,6 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
           <label className="flex items-center gap-1.5 text-sm text-slate-700">
             <input type="checkbox" name="leave" value="1" defaultChecked={f.leave} /> On approved leave
           </label>
-          {showAllFlags && <input type="hidden" name="flags" value="all" />}
           <div className="ml-auto flex gap-2">
             {(filtered || f.isRange || !isToday) && <Link href="/attendance" className="btn-ghost">Clear</Link>}
             <button className="btn-secondary" type="submit">Apply</button>
@@ -206,10 +227,11 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
         </p>
       </form>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard label="Expected" value={expected} hint={`Scheduled to work (${unit})`} />
         <StatCard label="Logged in" value={loggedIn} hint={`Signed in at least once (${unit})`} />
         <StatCard label="Currently working" value={working} tone={working ? 'green' : 'default'} href={q({ ...periodOnly, status: 'Currently Working' })} hint="Signed in, not yet signed out" />
+        <StatCard label="On a break" value={onBreak} tone={onBreak ? 'amber' : 'default'} href="#breaks" hint="Break running now" />
         <StatCard label="Late" value={late} tone={late ? 'amber' : 'default'} href={q({ ...periodOnly, late: true })} hint="After the grace period" />
         <StatCard label="Not logged in" value={notLogged} tone={notLogged ? 'grey' : 'default'} href={q({ ...periodOnly, status: 'Not Logged In' })} hint={isToday ? 'No sign-in yet on a working day' : 'No sign-in on a working day'} />
         <StatCard label="Left early" value={leftEarly} tone={leftEarly ? 'amber' : 'default'} href={q({ ...periodOnly, early: true })} hint="Signed out before the scheduled end" />
@@ -225,7 +247,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
         rows={report.error ? [] : shown}
         showEmployee
         showDate={f.isRange}
-        flagsHref="#flags"
+        flagsHref={exceptionsHref}
         employeeHref={f.member ? undefined : (r) => q({ member: r.member_id })}
         empty={
           report.error
@@ -238,27 +260,109 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch & { 
       <TimeZoneNote zones={shown.map((r) => r.tz)} />
 
       <section id="flags" className="scroll-mt-4">
-        <SectionTitle
-          action={
-            <Link href={flagsToggle} className="text-sm text-navy-700 hover:underline" scroll={false}>
-              {showAllFlags ? 'Show open flags only' : 'Show reviewed and resolved'}
-            </Link>
-          }
-        >
-          Flags{showAllFlags ? '' : ' to review'} ({flags.length})
+        <SectionTitle action={<Link href={exceptionsHref} className="text-sm text-navy-700 hover:underline">Open the exception queue →</Link>}>
+          Exceptions to review ({openExceptions})
         </SectionTitle>
-        <p className="mb-2 text-xs text-slate-500">
-          {showAllFlags ? 'All flags, open first (latest 300)' : 'Open flags from every date'}
-          {memberName ? ` for ${memberName}` : ''}. A flag is a prompt to check with the person, not a finding. Read their explanation before deciding.
-        </p>
-        {flagRes.error && <Notice tone="error">Could not load flags: {friendlyError(flagRes.error.message)}</Notice>}
-        <FlagList
-          flags={flags}
-          names={names}
-          tzFor={tzFor}
-          mode="admin"
-          empty={{ title: showAllFlags ? 'No flags yet' : 'No open flags', body: 'Late logins, early logouts, missed sign-ins and incomplete sessions appear here for review.' }}
-        />
+        {flagRes.error ? (
+          <Notice tone="error">Could not count open exceptions: {friendlyError(flagRes.error.message)}</Notice>
+        ) : (
+          <p className="card p-4 text-sm text-slate-700">
+            {openExceptions
+              ? `${openExceptions} exception${openExceptions === 1 ? ' is' : 's are'} waiting for a decision${memberName ? ` for ${memberName}` : ''}. Approve, reject or waive them one by one or in bulk in the exception queue.`
+              : 'No exceptions are waiting for a decision.'}{' '}
+            A flag is a prompt to check with the person, not a finding. Read their explanation before deciding.
+          </p>
+        )}
+      </section>
+
+      <section id="breaks" className="scroll-mt-4">
+        <SectionTitle>Breaks · {period}</SectionTitle>
+        {breakRes.error && <Notice tone="error">Could not load breaks: {friendlyError(breakRes.error.message)}</Notice>}
+        {breaks.length === 0 ? (
+          <EmptyState title="No breaks recorded in this period" body="Breaks appear here when people use the Break button on their dashboard, or when one is added by hand below." />
+        ) : (
+          <div className="card overflow-x-auto">
+            <table className="sheet">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Date</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th className="text-right">Length</th>
+                  <th>Recorded</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {breaks.map((b) => {
+                  const tz = tzFor(b.member_id, b.work_date);
+                  const mins = b.end_at ? Math.floor((new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000) : null;
+                  return (
+                    <tr key={b.id}>
+                      <td className="whitespace-nowrap font-medium text-navy-900">{names.get(b.member_id) ?? 'Former member'}</td>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDate(b.work_date)}</td>
+                      <td className="tabular-nums">{fmtClock(b.start_at, tz)}</td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {b.end_at ? fmtClock(b.end_at, tz) : b.closed_incomplete_at ? <span className="text-orange-700">Not ended</span> : <span className="text-amber-800">On break</span>}
+                      </td>
+                      <td className="text-right tabular-nums">{mins === null ? '—' : fmtMinutes(mins)}</td>
+                      <td className="whitespace-nowrap text-xs text-slate-600">
+                        {b.source === 'app' ? 'Break button' : `Added by ${b.entered_by ? names.get(b.entered_by) ?? 'someone' : 'someone'}`}
+                      </td>
+                      <td className="max-w-64 text-slate-600"><span className="line-clamp-2">{b.note || '—'}</span></td>
+                      <td>
+                        <ConfirmAction
+                          action={voidBreakAction}
+                          label="Remove"
+                          title="Remove this break?"
+                          body="It stops counting towards break time and hours worked. The record is kept, marked as removed, with your reason."
+                          confirmLabel="Remove break"
+                          className="btn-ghost px-2.5 py-1 text-xs"
+                          hidden={{ id: b.id }}
+                          withNote
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium text-navy-700">Add a missed break</summary>
+          <ActionForm action={addBreakAction} resetOnSuccess className="card mt-2 grid gap-3 p-4 sm:grid-cols-5 sm:items-end">
+            <div>
+              <label className="label" htmlFor="b-member">Employee</label>
+              <select id="b-member" name="member_id" className="input" required defaultValue={f.member ?? ''}>
+                <option value="" disabled>Choose…</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="b-date">Date</label>
+              <input id="b-date" type="date" name="work_date" className="input" required max={today} min={addDays(today, -60)} defaultValue={f.isRange ? today : f.from} />
+            </div>
+            <div>
+              <label className="label" htmlFor="b-start">Start</label>
+              <input id="b-start" type="time" name="start_time" className="input" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="b-end">End</label>
+              <input id="b-end" type="time" name="end_time" className="input" required />
+            </div>
+            <SubmitButton>Add break</SubmitButton>
+            <div className="sm:col-span-5">
+              <label className="label" htmlFor="b-note">Note</label>
+              <input id="b-note" name="note" className="input" maxLength={500} placeholder="e.g. Forgot to press Break at lunch" />
+            </div>
+            <p className="text-xs text-slate-500 sm:col-span-5">
+              Office time. The break must fall within that day&apos;s signed-in time and must not overlap another break.
+            </p>
+          </ActionForm>
+        </details>
       </section>
 
       <section id="corrections" className="scroll-mt-4">

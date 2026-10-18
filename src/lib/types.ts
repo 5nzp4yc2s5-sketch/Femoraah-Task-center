@@ -185,6 +185,15 @@ export interface AttendanceRow {
   record_id: string | null;
   open_flags: number;
   pending_correction: boolean;
+  exempt: boolean;
+  break_taken_minutes: number;
+  break_count: number;
+  on_break: boolean;
+  break_started_at: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  /** Where the hours came from: 'Personal', 'Team' or 'Company' (null without a schedule). */
+  schedule_source: string | null;
 }
 
 export interface MemberOption {

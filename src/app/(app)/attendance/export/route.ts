@@ -20,6 +20,9 @@ const HEADER = [
   'Incomplete Sessions',
   'Corrected',
   'Open Flags',
+  'Break Minutes',
+  'Exempt',
+  'Team',
 ];
 
 function plain(status: number, message: string): Response {
@@ -50,6 +53,9 @@ function csvRow(r: AttendanceRow): string {
     r.incomplete_sessions,
     r.corrected ? 'Yes' : 'No',
     r.open_flags,
+    r.break_taken_minutes,
+    r.exempt ? 'Yes' : 'No',
+    r.team_name ?? '',
   ]
     .map(csvField)
     .join(',');
@@ -77,10 +83,11 @@ export async function GET(request: Request) {
   if (to < from) return plain(400, 'The end date is before the start date.');
   if (daysBetween(from, to) > MAX_RANGE_DAYS - 1) return plain(400, `Choose a date range of up to ${MAX_RANGE_DAYS} days.`);
   if (sp.member && !UUID_RE.test(sp.member)) return plain(400, 'Unknown employee.');
+  if (sp.team && !UUID_RE.test(sp.team)) return plain(400, 'Unknown team.');
 
   // Expire stale sessions and create flags first, so the export matches the page. Idempotent.
   await supabase.rpc('attendance_refresh', { p_from: from, p_to: to });
-  const { data, error } = await supabase.rpc('attendance_report', { p_from: from, p_to: to, p_member: sp.member || null });
+  const { data, error } = await supabase.rpc('attendance_days_report', { p_from: from, p_to: to, p_member: sp.member || null, p_team: sp.team || null });
   if (error) {
     if (error.code === '42501') {
       return /not signed in/i.test(error.message) ? plain(401, 'Sign in and enter your PIN to export attendance.') : plain(403, 'You can only export your own attendance.');

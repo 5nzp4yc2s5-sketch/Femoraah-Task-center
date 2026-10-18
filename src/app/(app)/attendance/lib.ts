@@ -6,12 +6,30 @@ import { addDays, isIsoDate } from '@/lib/format';
 export const MAX_RANGE_DAYS = 93;
 export const DEFAULT_TZ = 'Asia/Kolkata';
 
-export const LOGIN_STATUSES = ['On Time', 'Within Grace Period', 'Late', 'Not Logged In', 'On Leave', 'Holiday', 'Weekly Off', 'No Schedule'] as const;
+export const LOGIN_STATUSES = ['On Time', 'Within Grace Period', 'Late', 'Exempt', 'Not Logged In', 'On Leave', 'Holiday', 'Weekly Off', 'No Schedule'] as const;
 export const LOGOUT_STATUSES = ['Currently Working', 'Logged Out', 'Left Early', 'Overtime', 'Incomplete Session'] as const;
 const ALL_STATUSES: readonly string[] = [...LOGIN_STATUSES, ...LOGOUT_STATUSES];
 
 export const FLAG_STATUSES = ['Open', 'Reviewed', 'Resolved'] as const;
 export type FlagStatus = (typeof FLAG_STATUSES)[number];
+
+/** Decisions on an exception. Approved and Waived ones do not count towards repeated flags. */
+export const DECISIONS = ['Approved', 'Rejected', 'Waived'] as const;
+export type Decision = (typeof DECISIONS)[number];
+
+/** Exception queue status filter: open (incl. reviewed), a decision, or resolved before decisions existed. */
+export const EXCEPTION_STATUSES = ['Open', 'Approved', 'Rejected', 'Waived', 'Resolved'] as const;
+
+export const FLAG_TYPES = [
+  'Late Login',
+  'Early Logout',
+  'Late Logout',
+  'Long Break',
+  'No Login',
+  'Incomplete Session',
+  'Repeated Late Login',
+  'Repeated Early Logout',
+] as const;
 
 /** ISO weekday 1 = Mon … 7 = Sun. */
 export const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -29,6 +47,7 @@ export interface FlagRow {
   reason: string;
   employee_explanation: string;
   status: FlagStatus;
+  decision: Decision | null;
   review_note: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -65,6 +84,7 @@ export interface ScheduleRow {
   created_by: string | null;
   created_at: string;
   updated_at?: string;
+  follows_default?: boolean;
 }
 
 /** A real calendar date in yyyy-mm-dd form (rejects 2026-02-31 and the like). */
@@ -86,6 +106,7 @@ export type AttendanceSearch = {
   from?: string;
   to?: string;
   member?: string;
+  team?: string;
   status?: string;
   late?: string;
   early?: string;
@@ -98,6 +119,7 @@ export interface Filters {
   to: string;
   isRange: boolean;
   member: string | null;
+  team: string | null;
   status: string | null;
   late: boolean;
   early: boolean;
@@ -135,6 +157,7 @@ export function parseFilters(sp: AttendanceSearch, today: string): { filters: Fi
       to,
       isRange: from !== to,
       member: sp.member && UUID_RE.test(sp.member) ? sp.member : null,
+      team: sp.team && UUID_RE.test(sp.team) ? sp.team : null,
       status,
       late: sp.late === '1',
       early: sp.early === '1',
@@ -174,6 +197,7 @@ export function filterQuery(f: Filters, overrides: Partial<Record<keyof Attendan
     from: f.from,
     to: f.isRange ? f.to : null,
     member: f.member,
+    team: f.team,
     status: f.status,
     late: f.late,
     early: f.early,
@@ -212,6 +236,11 @@ export function scheduleOn(schedules: ScheduleRow[], memberId: string, date: str
     if (!best || s.effective_from > best.effective_from) best = s;
   }
   return best;
+}
+
+/** What to show for a flag's state: its decision when it has one, otherwise its status. */
+export function flagState(f: Pick<FlagRow, 'status' | 'decision'>): string {
+  return f.decision ?? f.status;
 }
 
 /** Repeated-flag rows store a count in `minutes`; the others store minutes. */

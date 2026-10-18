@@ -1,5 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
+import type { AttendanceRow } from '@/lib/types';
 import { DEFAULT_TZ, scheduleOn, type ScheduleRow } from './lib';
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
@@ -96,4 +97,51 @@ export async function recordedTimes(
     if (!logout && s.incomplete_at) cur.incomplete += 1;
   }
   return out;
+}
+
+/** Computed attendance days with teams, exemptions and breaks (admins: everyone; others: themselves). */
+export async function loadDays(
+  supabase: Supa,
+  from: string,
+  to: string,
+  opts: { member?: string | null; team?: string | null } = {},
+): Promise<{ rows: AttendanceRow[]; error?: string }> {
+  const { data, error } = await supabase.rpc('attendance_days_report', { p_from: from, p_to: to, p_member: opts.member ?? null, p_team: opts.team ?? null });
+  return { rows: (data ?? []) as AttendanceRow[], error: error?.message };
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  note: string;
+  is_active: boolean;
+}
+
+export async function loadTeams(supabase: Supa): Promise<Team[]> {
+  const { data } = await supabase.from('teams').select('id, name, note, is_active').order('name');
+  return (data ?? []) as Team[];
+}
+
+/** Each person's hours on a date and where they come from (personal, team or company default). */
+export interface ScheduleOverview {
+  member_id: string;
+  member_name: string;
+  is_active: boolean;
+  team_id: string | null;
+  team_name: string | null;
+  source: 'Personal' | 'Team' | 'Company' | null;
+  follows_default: boolean;
+  personal_from: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  working_days: number[] | null;
+  break_minutes: number | null;
+  grace_minutes: number | null;
+  timezone: string | null;
+  exempt: boolean;
+}
+
+export async function scheduleOverview(supabase: Supa, date?: string): Promise<{ rows: ScheduleOverview[]; error?: string }> {
+  const { data, error } = await supabase.rpc('schedule_overview', { p_date: date ?? null });
+  return { rows: (data ?? []) as ScheduleOverview[], error: error?.message };
 }

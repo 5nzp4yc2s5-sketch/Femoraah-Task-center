@@ -9,6 +9,7 @@ import { AttendanceBadge, Avatar, CapacityBadge } from '@/components/badges';
 import { LocalTime } from '@/components/local-time';
 import { TaskTable } from '@/components/task-table';
 import { RoutineTable } from '@/components/routine-table';
+import { BreakControl } from './attendance/break-control';
 
 export const metadata = { title: 'My Dashboard' };
 
@@ -74,7 +75,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
   const [calendar, attendance] = today
     ? await Promise.all([
         supabase.rpc('team_calendar', { p_from: today, p_to: addDays(today, 30) }),
-        supabase.rpc('attendance_report', { p_from: today, p_to: today, p_member: me.memberId }),
+        supabase.rpc('attendance_days_report', { p_from: today, p_to: today, p_member: me.memberId }),
       ])
     : [null, null];
   const upcoming30 = (calendar?.data ?? []) as CalendarEntry[];
@@ -208,6 +209,18 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
                   <dd className="tabular-nums text-slate-700">{fmtMinutes(attendanceToday.worked_minutes)}</dd>
                 </div>
               </dl>
+              {(attendanceToday.open_session || attendanceToday.break_count > 0) && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <BreakControl
+                    canBreak={attendanceToday.open_session}
+                    onBreak={attendanceToday.on_break}
+                    startedAt={attendanceToday.break_started_at}
+                    takenMinutes={attendanceToday.break_taken_minutes}
+                    allowance={attendanceToday.day_type === 'Working Day' ? attendanceToday.break_minutes : null}
+                    tz={attendanceToday.tz}
+                  />
+                </div>
+              )}
               {attendanceToday.pending_correction && <p className="mt-3 text-xs text-slate-600">You have a correction request waiting for review.</p>}
               <p className="mt-3 text-xs text-slate-500">Times are recorded by the server when you sign in and out (shown in {attendanceToday.tz}).</p>
             </div>

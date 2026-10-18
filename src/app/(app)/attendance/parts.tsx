@@ -6,8 +6,8 @@ import { AttendanceBadge, Avatar } from '@/components/badges';
 import { LocalTime } from '@/components/local-time';
 import { EmptyState } from '@/components/ui';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
-import { decideCorrectionAction, explainFlagAction, reviewFlagAction } from './actions';
-import { flagAmount, type CorrectionRow, type FlagRow } from './lib';
+import { decideCorrectionAction, explainFlagAction } from './actions';
+import { flagAmount, flagState, type CorrectionRow, type FlagRow } from './lib';
 import type { AttendanceSettings, Recorded } from './data';
 
 const pill = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
@@ -19,8 +19,8 @@ export function PrivacyNote({ settings }: { settings: AttendanceSettings | null 
       <h2 id="att-privacy" className="font-semibold text-navy-900">How attendance is recorded</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>
-          Only two things are recorded: the time you sign in with your PIN and the time you sign out. Both use the server&apos;s clock, not the
-          device&apos;s, and nobody can edit them directly.
+          Only these are recorded: the time you sign in with your PIN, the time you sign out, and the start and end of any break you take with the
+          Break button. All use the server&apos;s clock, not the device&apos;s, and nobody can edit them directly.
         </li>
         <li>No keystrokes, screenshots, webcam footage, location or other device activity are collected.</li>
         <li>
@@ -29,8 +29,9 @@ export function PrivacyNote({ settings }: { settings: AttendanceSettings | null 
           guessed; you can request a correction.
         </li>
         <li>
-          Flags (late login, early logout, no login, incomplete session, repeated patterns) are prompts to check, not findings of misconduct. You can
-          add an explanation to any flag, and corrections are approved by an admin with the original times kept on record.
+          Flags (late login, early logout, no login, incomplete session, long break, repeated patterns) are prompts to check, not findings of
+          misconduct. You can add an explanation to any flag; an admin approves, rejects or waives it. Corrections are approved by an admin with the
+          original times kept on record.
         </li>
       </ul>
     </section>
@@ -68,11 +69,29 @@ export function HoursCell({ r }: { r: AttendanceRow }) {
     <span className="whitespace-nowrap tabular-nums">
       {fmtMinutes(r.worked_minutes)}
       {r.open_session && <span className="ml-1 text-xs text-slate-500">so far</span>}
+      {r.break_count > 0 && (
+        <span className="block text-xs text-slate-500">
+          after {fmtMinutes(r.break_taken_minutes)} break{r.break_count === 1 ? '' : 's'}
+        </span>
+      )}
       {r.incomplete_sessions > 0 && (
         <span className="block text-xs text-orange-700">
           {r.incomplete_sessions} incomplete session{r.incomplete_sessions === 1 ? '' : 's'} not counted
         </span>
       )}
+    </span>
+  );
+}
+
+/** Break time taken against the allowance, with a live marker while on a break. */
+export function BreakCell({ r }: { r: AttendanceRow }) {
+  if (r.day_type !== 'Working Day' && r.break_count === 0) return <span className="text-slate-400">—</span>;
+  const over = r.break_minutes !== null && r.break_taken_minutes > r.break_minutes;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 whitespace-nowrap tabular-nums">
+      <span className={over ? 'font-medium text-amber-800' : ''}>{fmtMinutes(r.break_taken_minutes)}</span>
+      {r.break_minutes !== null && <span className="text-xs text-slate-500">of {fmtMinutes(r.break_minutes)}</span>}
+      {r.on_break && <AttendanceBadge status="On Break" />}
     </span>
   );
 }
@@ -84,9 +103,10 @@ function scheduled(r: AttendanceRow, iso: string | null) {
 }
 
 function Markers({ r, flagsHref }: { r: AttendanceRow; flagsHref?: string }) {
-  if (!r.corrected && !r.open_flags && !r.pending_correction) return null;
+  if (!r.corrected && !r.open_flags && !r.pending_correction && !r.exempt) return null;
   return (
     <span className="mt-1 flex flex-wrap gap-1">
+      {r.exempt && <span className={`${pill} bg-sky-50 text-sky-800 ring-sky-200`} title="Exempt from late, early and long-break flags on this day. Times are still recorded.">Exempt</span>}
       {r.corrected && <span className={`${pill} bg-blue-50 text-blue-800 ring-blue-200`} title="An admin approved a correction for this day; the original times are kept on record.">Corrected</span>}
       {r.pending_correction && <span className={`${pill} bg-white text-slate-600 ring-slate-200`}>Correction pending</span>}
       {r.open_flags > 0 &&
@@ -157,6 +177,12 @@ export function AttendanceTable({
               </span>
             </div>
             <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              {(r.break_count > 0 || r.on_break) && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-slate-500">Breaks</dt>
+                  <dd><BreakCell r={r} /></dd>
+                </div>
+              )}
               <div>
                 <dt className="text-xs text-slate-500">Login{r.day_type === 'Working Day' ? ` (scheduled ${fmtClock(r.scheduled_start, r.tz)})` : ''}</dt>
                 <dd className="tabular-nums">{fmtClock(r.first_login, r.tz)}</dd>
@@ -192,6 +218,7 @@ export function AttendanceTable({
               <th>Scheduled End</th>
               <th>Actual Logout</th>
               <th>Logout Status</th>
+              <th>Breaks</th>
               <th>Hours Worked</th>
             </tr>
           </thead>
@@ -226,6 +253,7 @@ export function AttendanceTable({
                 <td className="whitespace-nowrap">{scheduled(r, r.scheduled_end)}</td>
                 <td className="whitespace-nowrap tabular-nums">{fmtClock(r.last_logout, r.tz)}</td>
                 <td><LogoutStatusCell r={r} /></td>
+                <td><BreakCell r={r} /></td>
                 <td><HoursCell r={r} /></td>
               </tr>
             ))}
@@ -255,18 +283,16 @@ function flagActual(f: FlagRow, tz: string) {
   return '—';
 }
 
-/** Flags as cards (open first). Admins get review controls; the employee can explain their own. */
+/** A person's own flags as cards (open first), where they can add an explanation. Admins decide them in the exception queue. */
 export function FlagList({
   flags,
   names,
   tzFor,
-  mode,
   empty,
 }: {
   flags: FlagRow[];
   names: Map<string, string>;
   tzFor: (memberId: string, date: string) => string;
-  mode: 'admin' | 'self';
   empty: { title: string; body?: string; action?: ReactNode };
 }) {
   if (flags.length === 0) return <EmptyState title={empty.title} body={empty.body} action={empty.action} />;
@@ -275,17 +301,17 @@ export function FlagList({
       {flags.map((f) => {
         const tz = tzFor(f.member_id, f.work_date);
         const repeated = f.flag_type.startsWith('Repeated');
+        const state = flagState(f);
         return (
           <li key={f.id} className={`card border-l-4 p-4 ${f.status === 'Open' ? 'border-l-amber-500' : f.status === 'Reviewed' ? 'border-l-slate-400' : 'border-l-green-600'}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-medium text-navy-900">{f.flag_type}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-                  {mode === 'admin' && <span className="font-medium text-slate-700">{names.get(f.member_id) ?? 'Former member'}</span>}
                   <span>{fmtDate(f.work_date)}</span>
                 </div>
               </div>
-              <AttendanceBadge status={f.status} />
+              <AttendanceBadge status={state} />
             </div>
             <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
               <div>
@@ -303,42 +329,17 @@ export function FlagList({
             </dl>
             <p className="mt-3 text-sm text-slate-700">{f.reason}</p>
             <div className="mt-3 rounded-lg bg-navy-50 px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{mode === 'admin' ? 'Employee explanation' : 'Your explanation'}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your explanation</div>
               <p className={`mt-0.5 whitespace-pre-wrap ${f.employee_explanation ? 'text-slate-800' : 'text-slate-500'}`}>{f.employee_explanation || 'No explanation yet.'}</p>
             </div>
             {f.status !== 'Open' && (
               <p className="mt-2 text-xs text-slate-600">
-                {f.status} by {f.reviewed_by ? names.get(f.reviewed_by) ?? 'an admin' : 'an admin'}
+                {state} by {f.reviewed_by ? names.get(f.reviewed_by) ?? 'an admin' : 'an admin'}
                 {f.reviewed_at && <> · <LocalTime iso={f.reviewed_at} /></>}
                 {f.review_note && <span className="block text-sm text-slate-700">Note: {f.review_note}</span>}
               </p>
             )}
-            {mode === 'admin' && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-sm font-medium text-navy-700">{f.status === 'Open' ? 'Review this flag' : 'Change review'}</summary>
-                <ActionForm action={reviewFlagAction} className="mt-2 space-y-2">
-                  <input type="hidden" name="id" value={f.id} />
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div>
-                      <label className="label" htmlFor={`st-${f.id}`}>Status</label>
-                      <select id={`st-${f.id}`} name="status" className="input" defaultValue={f.status === 'Open' ? 'Reviewed' : f.status}>
-                        <option value="Reviewed">Reviewed</option>
-                        <option value="Resolved">Resolved</option>
-                        {f.status !== 'Open' && <option value="Open">Reopen</option>}
-                      </select>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="label" htmlFor={`note-${f.id}`}>Note</label>
-                      <input id={`note-${f.id}`} name="note" className="input" maxLength={1000} defaultValue={f.review_note} placeholder="e.g. Spoke to them; transport delay" />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <SubmitButton className="btn-secondary">Save review</SubmitButton>
-                  </div>
-                </ActionForm>
-              </details>
-            )}
-            {mode === 'self' && f.status !== 'Resolved' && (
+            {f.status !== 'Resolved' && (
               <details className="mt-3">
                 <summary className="cursor-pointer text-sm font-medium text-navy-700">{f.employee_explanation ? 'Edit explanation' : 'Add explanation'}</summary>
                 <ActionForm action={explainFlagAction} className="mt-2 space-y-2">

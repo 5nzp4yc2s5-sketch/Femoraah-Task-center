@@ -30,6 +30,8 @@ export function friendlyError(message: string | undefined | null): string {
   if (/duplicate key.*username/i.test(message)) return 'That username is already taken.';
   if (/members_active_name_uq/i.test(message)) return 'An active member already has that name.';
   if (/invalid input value for enum/i.test(message)) return 'That value is not one of the allowed options.';
+  if (/attendance_one_open_break/i.test(message)) return 'You are already on a break.';
+  if (/break_minutes_check|grace_minutes_check/i.test(message)) return 'The break must be 0–240 minutes and the grace period 0–120 minutes.';
   return message.replace(/^.*?ERROR:\s*/, '');
 }
 
