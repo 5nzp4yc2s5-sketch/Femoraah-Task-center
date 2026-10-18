@@ -60,8 +60,11 @@ export async function resetData(): Promise<void> {
     update public.backlog_items set task_id = null, status = 'Pending', approval = 'Pending';
     delete from public.tasks; delete from public.backlog_items;
     delete from public.leaves; delete from public.holidays;
+    delete from public.attendance_breaks; delete from public.attendance_exemptions;
     delete from public.attendance_flags; delete from public.attendance_corrections;
     delete from public.attendance_sessions; delete from public.attendance_records;
+    delete from public.member_teams; delete from public.schedule_defaults; delete from public.teams;
+    update public.app_settings set late_logout_flag_minutes = null, long_break_grace_minutes = 10, repeat_flag_count = 3;
     delete from public.routine_completions where note <> 'Imported from spreadsheet';
     delete from public.login_attempts; delete from public.verified_sessions;
     update public.member_pins set failed_attempts = 0, locked_until = null;
