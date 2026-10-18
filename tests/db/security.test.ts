@@ -494,12 +494,15 @@ describe('routines', () => {
 
   it('overdue routine shows Overdue, counts on the dashboard, and history is kept', async () => {
     const r = await routineId('Pack orders');
+    // imported spreadsheet completions age with the calendar, so compare with the count before this routine goes overdue
+    const k = await login('Kartik');
+    const base = (await k.rpc('manager_dashboard')).data;
+    const baseDev = base.people.find((p: { name: string }) => p.name === 'Dev').routine_overdue;
     await db.query(`insert into public.routine_completions (routine_id, cycle_due, completed_on, completed_by)
                     values ($1, private.today() - 5, private.today() - 5, $2)`, [r.id, r.owner_id]);
-    const k = await login('Kartik');
     const dash = (await k.rpc('manager_dashboard')).data;
-    expect(dash.routine_overdue).toBe(1);
-    expect(dash.people.find((p: { name: string }) => p.name === 'Dev').routine_overdue).toBe(1);
+    expect(dash.routine_overdue).toBe(base.routine_overdue + 1);
+    expect(dash.people.find((p: { name: string }) => p.name === 'Dev').routine_overdue).toBe(baseDev + 1);
     const d = await login('Dev');
     const { data: before } = await d.from('routine_board').select('status').eq('id', r.id).single();
     expect(before!.status).toBe('Overdue');

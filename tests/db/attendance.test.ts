@@ -74,7 +74,8 @@ describe('attendance acceptance tests', () => {
     expect(r).toMatchObject({ login_status: 'Within Grace Period', minutes_late: 7 });
     const k = await login('Kartik');
     await k.rpc('attendance_refresh', { p_from: await day(-3), p_to: await day(-3) });
-    expect((await db.query("select count(*)::int n from public.attendance_flags where flag_type = 'Late Login'")).rows[0].n).toBe(0);
+    // only Zinia's day counts: signing in as Kartik for the refresh can raise his own Late Login for today
+    expect((await db.query("select count(*)::int n from public.attendance_flags where flag_type = 'Late Login' and member_id = $1 and work_date = $2", [ids.Zinia, await day(-3)])).rows[0].n).toBe(0);
   });
 
   it('3. logs in late (10:15 is 15 min late, grace shown separately) and gets a Late Login flag', async () => {
@@ -276,11 +277,11 @@ describe('attendance acceptance tests', () => {
     const rows = (await db.query('select logout_at from public.attendance_sessions where member_id = $1 order by login_at', [ids.Zinia])).rows;
     expect(rows).toHaveLength(2);
     expect(rows[0].logout_at.getTime()).toBe(closed.getTime());
-    // signing out before the scheduled end is not flagged until the end has passed (it may be a break)
+    // signing out before the scheduled end is not flagged until the end has passed (it may be a break);
+    // a sign-out after 19:00 is not early at all, so with real-time sessions there is never a flag here
     await k.rpc('attendance_refresh', { p_from: today, p_to: today });
-    const beforeEnd = (await db.query("select now() < (private.today() + time '19:00') at time zone 'Asia/Kolkata' as b")).rows[0].b;
     const early = (await db.query("select count(*)::int n from public.attendance_flags where member_id = $1 and flag_type = 'Early Logout' and work_date = $2", [ids.Zinia, today])).rows[0].n;
-    expect(early).toBe(beforeEnd ? 0 : 1);
+    expect(early).toBe(0);
   });
 });
 
