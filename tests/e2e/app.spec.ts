@@ -398,8 +398,16 @@ test('Attendance phase 2: teams and default hours, breaks, the exception queue a
   await admin.locator('#mt-team').selectOption({ label: 'Warehouse' });
   await admin.getByRole('button', { name: 'Save team' }).click();
   await expect(admin.getByText(/Team saved\. It applies from the chosen date/)).toBeVisible();
-  await admin.reload();
-  await expect(admin.getByRole('row', { name: /Zinia/ }).getByText('Warehouse')).toBeVisible();
+  // Zinia follows the defaults from today: Warehouse has none, so she gets the company's 09:30 start
+  await admin.goto('/attendance/schedules');
+  await admin.locator('#f-member').selectOption({ label: 'Zinia' });
+  await admin.getByRole('button', { name: 'Follow defaults' }).click();
+  await expect(admin.getByText(/this person follows the team or company default hours/)).toBeVisible();
+  await admin.goto('/settings');
+  const ziniaRow = admin.getByRole('row', { name: /Zinia/ });
+  await expect(ziniaRow.getByText('Warehouse')).toBeVisible();
+  await expect(ziniaRow.getByText('Company default')).toBeVisible();
+  await expect(ziniaRow.getByText(/09:30–19:00/)).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/15-settings.png`, fullPage: true });
 
   // Breaks from My Dashboard
