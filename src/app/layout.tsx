@@ -1,17 +1,33 @@
 import type { Metadata, Viewport } from 'next';
+import { brandCss, getBrand } from '@/lib/brand';
+import { DEFAULT_BRAND } from '@/lib/colors';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: { default: 'OpsPulse Workspace', template: '%s · OpsPulse' },
-  description: 'Team task command center',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBrand();
+  const short = brand.savedName ?? 'OpsPulse';
+  return {
+    title: { default: brand.companyName, template: `%s · ${short}` },
+    description: brand.tagline,
+    robots: { index: false, follow: false },
+  };
+}
 
-export const viewport: Viewport = { themeColor: '#1f3a5f', width: 'device-width', initialScale: 1 };
+export async function generateViewport(): Promise<Viewport> {
+  const brand = await getBrand();
+  return { themeColor: brand.secondary ?? DEFAULT_BRAND.secondary, width: 'device-width', initialScale: 1 };
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const css = brandCss(await getBrand());
   return (
     <html lang="en">
+      {/* Brand colours replace the theme's; the values are validated hex codes. */}
+      {css && (
+        <head>
+          <style>{css}</style>
+        </head>
+      )}
       <body className="min-h-dvh font-sans antialiased">{children}</body>
     </html>
   );

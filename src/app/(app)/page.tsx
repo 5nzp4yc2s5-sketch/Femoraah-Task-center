@@ -10,6 +10,7 @@ import { LocalTime } from '@/components/local-time';
 import { TaskTable } from '@/components/task-table';
 import { RoutineTable } from '@/components/routine-table';
 import { BreakControl } from './attendance/break-control';
+import { QuoteCard } from '@/components/quote-card';
 
 export const metadata = { title: 'My Dashboard' };
 
@@ -54,6 +55,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
     routines,
     { data: coveringData },
     { data: activityData, error: activityError },
+    { data: quoteData },
   ] = await Promise.all([
     supabase.rpc('my_summary'),
     supabase.from('task_board').select('*').is('archived_at', null).order('last_update_at', { ascending: false }).limit(500),
@@ -67,6 +69,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
       .or(`actor_id.is.null,actor_id.neq.${me.memberId}`)
       .order('at', { ascending: false })
       .limit(15),
+    supabase.rpc('quote_of_the_day'),
   ]);
   const summary = (summaryData ?? null) as MySummary | null;
   const today = summary?.today;
@@ -106,6 +109,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
           </>
         }
       />
+      <QuoteCard quote={((quoteData ?? []) as { body: string; author: string }[])[0] ?? null} />
       {summaryError && <Notice tone="error">Could not load your summary: {friendlyError(summaryError.message)}</Notice>}
       {tasksError && <Notice tone="error">Could not load your tasks: {friendlyError(tasksError.message)}</Notice>}
       {summary?.on_leave && <Notice>You are on leave today.</Notice>}

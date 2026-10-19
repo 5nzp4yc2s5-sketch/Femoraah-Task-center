@@ -23,8 +23,9 @@ export interface HolidayOption {
 
 /**
  * Leave form fields. Managers choose anyone; everyone else records only their own leave, so their
- * name is shown fixed and their own member id is sent. The "holiday you will work instead" field
- * only appears for Holiday Swap, and the backup list never offers the person on leave.
+ * name is shown fixed and their own member id is sent. The "day you will work instead" field
+ * only appears for Holiday Swap (a company holiday or one of the person's weekly offs), and the
+ * backup list never offers the person on leave.
  */
 export function LeaveFields({
   members,
@@ -47,6 +48,9 @@ export function LeaveFields({
   const [person, setPerson] = useState(initialPerson);
   const [type, setType] = useState(initialType);
   const [start, setStart] = useState(initialStart);
+  // An existing swap of a day that is not on the holiday list was a weekly off.
+  const initialSwap = leave?.swap_for_date ? (holidays.some((h) => h.holiday_date === leave.swap_for_date) ? leave.swap_for_date : 'weekly') : '';
+  const [swap, setSwap] = useState(initialSwap);
   const wrap = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLInputElement>(null);
 
@@ -58,10 +62,11 @@ export function LeaveFields({
       setPerson(initialPerson);
       setType(initialType);
       setStart(initialStart);
+      setSwap(initialSwap);
     };
     form.addEventListener('reset', onReset);
     return () => form.removeEventListener('reset', onReset);
-  }, [initialPerson, initialType, initialStart]);
+  }, [initialPerson, initialType, initialStart, initialSwap]);
 
   // When editing, keep a person or backup who has since left visible (saving then asks for an active one).
   const isActive = (id: string) => members.some((m) => m.id === id);
@@ -70,10 +75,6 @@ export function LeaveFields({
     ...members.filter((m) => m.id !== person),
     ...(leave?.backup_member_id && !isActive(leave.backup_member_id) ? [{ id: leave.backup_member_id, name: `${leave.backup_name ?? 'Former member'} (inactive)` }] : []),
   ];
-  const swapOptions =
-    leave?.swap_for_date && !holidays.some((h) => h.holiday_date === leave.swap_for_date)
-      ? [{ holiday_date: leave.swap_for_date, name: 'not on the holiday list' }, ...holidays]
-      : holidays;
   const personName = people.find((m) => m.id === person)?.name;
   const minDate = isManager ? undefined : today;
 
@@ -123,19 +124,38 @@ export function LeaveFields({
       </div>
       {type === 'Holiday Swap' && (
         <div className="sm:col-span-2">
-          <label className="label" htmlFor="leave-swap">Holiday you will work instead</label>
-          <select id="leave-swap" name="swap_for_date" className="input" defaultValue={leave?.swap_for_date ?? ''}>
-            <option value="">Not decided yet</option>
-            {swapOptions.map((h) => (
-              <option key={h.holiday_date} value={h.holiday_date}>
-                {fmtDate(h.holiday_date)} · {h.name}
-              </option>
-            ))}
-          </select>
+          <label className="label" htmlFor="leave-swap">Day you will work instead</label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select id="leave-swap" name="swap_for_date" className="input" value={swap} onChange={(e) => setSwap(e.target.value)}>
+              <option value="">Not decided yet</option>
+              <option value="weekly">A weekly off (choose the date)</option>
+              {holidays.length > 0 && (
+                <optgroup label="Company holidays">
+                  {holidays.map((h) => (
+                    <option key={h.holiday_date} value={h.holiday_date}>
+                      {fmtDate(h.holiday_date)} · {h.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {swap === 'weekly' && (
+              <input
+                name="swap_weekly_date"
+                type="date"
+                className="input"
+                required
+                aria-label="Weekly off you will work"
+                defaultValue={initialSwap === 'weekly' ? (leave?.swap_for_date ?? '') : ''}
+              />
+            )}
+          </div>
           <p className="mt-1 text-xs text-slate-500">
-            {holidays.length === 0
-              ? 'No company holidays are on the calendar for the past or next 12 months. A manager adds them under Add holiday.'
-              : `That company holiday becomes a normal working day for ${personName ?? 'this person'}.`}
+            {swap === 'weekly'
+              ? `Pick one of ${personName ?? 'this person'}'s weekly offs, for example a Sunday. That day becomes a normal working day for them.`
+              : holidays.length === 0
+                ? 'No company holidays are on the calendar for the past or next 12 months. You can still swap a weekly off.'
+                : `That day becomes a normal working day for ${personName ?? 'this person'}.`}
           </p>
         </div>
       )}

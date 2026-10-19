@@ -7,6 +7,7 @@ import { EmptyState, Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { dbToday, loadTeams, scheduleOverview } from '../attendance/data';
 import { DAY_LABELS, DEFAULT_TZ, daysLabel, hhmm, timeZoneOptions } from '../attendance/lib';
 import { attendanceRulesAction, saveTeamAction, setDefaultHoursAction, setMemberTeamAction } from './actions';
+import { SettingsTabs } from './tabs';
 
 export const metadata = { title: 'Settings' };
 
@@ -56,7 +57,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     supabase.from('member_teams').select('member_id, team_id, effective_from').order('effective_from'),
     supabase.from('app_settings').select('late_logout_flag_minutes, long_break_grace_minutes, timezone').limit(1).maybeSingle(),
   ]);
-  const header = <PageHeader title="Settings" subtitle="Teams, default working hours and weekly offs, and attendance rules." />;
+  const header = (
+    <>
+      <PageHeader title="Settings" subtitle="Teams, default working hours and weekly offs, and attendance rules." />
+      <SettingsTabs current="/settings" />
+    </>
+  );
   if (!today) {
     return (
       <>

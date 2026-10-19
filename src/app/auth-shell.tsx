@@ -1,14 +1,21 @@
 import type { ReactNode } from 'react';
+import { getBrand, initials } from '@/lib/brand';
 
-export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+export async function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  const brand = await getBrand();
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-navy-800 px-4 py-10">
+    <main className="flex min-h-dvh items-center justify-center bg-sidebar px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-3 text-white">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-base font-bold text-navy-800">OP</span>
+          {brand.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.logoUrl} alt="" className="h-10 w-10 rounded-xl bg-white object-contain p-1" />
+          ) : (
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-base font-bold text-navy-800">{initials(brand.companyName)}</span>
+          )}
           <span>
-            <span className="block text-lg font-semibold leading-tight">OpsPulse Workspace</span>
-            <span className="block text-xs uppercase tracking-wider text-navy-100/75">Team task command center</span>
+            <span className="block text-lg font-semibold leading-tight">{brand.companyName}</span>
+            <span className="block text-xs uppercase tracking-wider text-navy-100/75">{brand.tagline}</span>
           </span>
         </div>
         <div className="rounded-2xl bg-white p-6 shadow-xl">

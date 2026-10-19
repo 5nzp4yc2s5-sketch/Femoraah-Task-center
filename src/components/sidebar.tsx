@@ -28,7 +28,29 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-export function Sidebar({ name, role, isManager, isAdmin, signOut }: { name: string; role: string; isManager: boolean; isAdmin: boolean; signOut: () => Promise<void> }) {
+export interface SidebarBrand {
+  name: string;
+  short: string;
+  tagline: string;
+  mark: string;
+  logoUrl: string | null;
+}
+
+export function Sidebar({
+  name,
+  role,
+  isManager,
+  isAdmin,
+  signOut,
+  brand: b,
+}: {
+  name: string;
+  role: string;
+  isManager: boolean;
+  isAdmin: boolean;
+  signOut: () => Promise<void>;
+  brand: SidebarBrand;
+}) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
@@ -70,18 +92,23 @@ export function Sidebar({ name, role, isManager, isAdmin, signOut }: { name: str
   );
 
   const brand = (
-    <div className="flex items-center gap-2.5 px-5 py-4">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-navy-800">OP</span>
-      <span className="leading-tight">
-        <span className="block text-sm font-semibold text-white">OpsPulse</span>
-        <span className="block text-[11px] uppercase tracking-wider text-navy-100/70">Workspace</span>
+    <div className="flex min-w-0 items-center gap-2.5 px-5 py-4">
+      {b.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={b.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg bg-white object-contain p-0.5" />
+      ) : (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-bold text-navy-800">{b.mark}</span>
+      )}
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-sm font-semibold text-white">{b.short}</span>
+        <span className="block truncate text-[11px] uppercase tracking-wider text-navy-100/70">{b.tagline}</span>
       </span>
     </div>
   );
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between bg-navy-800 px-4 py-2.5 lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-2.5 lg:hidden">
         {brand}
         <button type="button" className="rounded-lg p-2 text-white hover:bg-white/10" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -91,7 +118,7 @@ export function Sidebar({ name, role, isManager, isAdmin, signOut }: { name: str
       </header>
       {open && <div className="fixed inset-0 z-40 bg-navy-950/50 lg:hidden" onClick={() => setOpen(false)} aria-hidden />}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-navy-800 transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between">
           {brand}

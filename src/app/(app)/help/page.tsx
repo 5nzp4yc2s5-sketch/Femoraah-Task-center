@@ -93,6 +93,7 @@ export default async function Help() {
         <ul className="list-disc space-y-1.5 pl-5">
           <li>Everyone can see who is away and on which dates. The type of leave and any note are shown only to managers, the person and their backup.</li>
           <li>You can add your own upcoming leave. Managers can add leave for anyone and manage company holidays.</li>
+          <li><strong>Holiday Swap</strong>: you work a company holiday or one of your weekly offs, and take another day off instead. Choose the day you will work on the leave form; that day then counts as a normal working day for you.</li>
           <li>Each person has a <strong>Max Open Tasks</strong> (10 unless an admin changes it). <strong>Available</strong> = below it, <strong>At Capacity</strong> = exactly at it, <strong>Overloaded</strong> = above it, <strong>On Leave</strong> = on leave today.</li>
         </ul>
       </Card>
@@ -111,6 +112,10 @@ export default async function Help() {
       <Card title="The Dashboards">
         <p><strong>My Dashboard</strong> shows only your work: tasks due today, overdue, blocked and coming up in the next 7 days, your routines, your workload against your capacity, recent changes others made to tasks you can see, upcoming leave and holidays, and your attendance today.</p>
         <p>The manager&apos;s <strong>Dashboard</strong> shows team-wide counts that can be filtered by employee, status, priority, due dates and routine frequency, workload and capacity per person, and an escalation list of overdue and blocked work. Every number is counted from live records; select one to open the matching list.</p>
+      </Card>
+
+      <Card title="Company look and daily quote">
+        <p>An admin can set the company name, logo and colours under <strong>Settings → Company &amp; branding</strong>. Colours that would make text hard to read are refused. Everyone sees the same motivational quote on their dashboard each day; an admin manages the list under <strong>Settings → Quotes</strong>.</p>
       </Card>
 
       <Card title="Signing in">

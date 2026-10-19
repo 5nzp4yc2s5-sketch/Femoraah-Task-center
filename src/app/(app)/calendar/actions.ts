@@ -19,7 +19,8 @@ const leaveSchema = z
     start_date: isoDate('Choose the first day of leave'),
     end_date: isoDate('Choose the last day of leave'),
     backup_member_id: z.preprocess(blankToNull, z.uuid('Choose a backup from the list').nullable()),
-    swap_for_date: z.preprocess(blankToNull, isoDate('Choose the holiday you will work from the list').nullable()),
+    swap_for_date: z.preprocess(blankToNull, z.union([z.literal('weekly'), isoDate('Choose the day you will work from the list')]).nullable()),
+    swap_weekly_date: z.preprocess(blankToNull, isoDate('Choose the weekly off you will work').nullable()).optional(),
     note: z.string().trim().max(500, 'Keep the note under 500 characters').default(''),
   })
   .refine((d) => d.end_date >= d.start_date, { message: 'The end date cannot be before the start date.', path: ['end_date'] })
@@ -32,22 +33,31 @@ const leaveSchema = z
     path: ['backup_member_id'],
   });
 
-type LeaveInput = z.infer<typeof leaveSchema>;
+type LeaveInput = Omit<z.infer<typeof leaveSchema>, 'swap_for_date' | 'swap_weekly_date'> & { swap_for_date: string | null };
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** Validate the leave form. Holiday Swap may name the company holiday the person will work instead. */
+/**
+ * Validate the leave form. Holiday Swap may name the day the person will work instead: a company
+ * holiday from the list, or one of their weekly offs (the database checks it really is one).
+ */
 async function parseLeave(formData: FormData, supabase: Supabase): Promise<{ error: string } | { data: LeaveInput }> {
   const parsed = leaveSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const d = { ...parsed.data };
-  if (d.leave_type !== 'Holiday Swap') d.swap_for_date = null;
-  if (d.swap_for_date) {
-    if (d.swap_for_date >= d.start_date && d.swap_for_date <= d.end_date) {
-      return { error: 'The holiday you will work cannot fall inside the leave dates.' };
+  const { swap_weekly_date, swap_for_date: choice, ...rest } = parsed.data;
+  const d: LeaveInput = { ...rest, swap_for_date: null };
+  if (rest.leave_type === 'Holiday Swap' && choice) {
+    if (choice === 'weekly') {
+      if (!swap_weekly_date) return { error: 'Choose the weekly off you will work.' };
+      d.swap_for_date = swap_weekly_date;
+    } else {
+      const { data: holiday, error } = await supabase.from('holidays').select('id').eq('holiday_date', choice).maybeSingle();
+      if (error) return { error: friendlyError(error.message) };
+      if (!holiday) return { error: `There is no company holiday on ${fmtDate(choice)}. Choose one from the list, or a weekly off.` };
+      d.swap_for_date = choice;
     }
-    const { data: holiday, error } = await supabase.from('holidays').select('id').eq('holiday_date', d.swap_for_date).maybeSingle();
-    if (error) return { error: friendlyError(error.message) };
-    if (!holiday) return { error: `There is no company holiday on ${fmtDate(d.swap_for_date)}. Choose one from the list.` };
+    if (d.swap_for_date >= d.start_date && d.swap_for_date <= d.end_date) {
+      return { error: 'The day you will work cannot fall inside the leave dates.' };
+    }
   }
   return { data: d };
 }

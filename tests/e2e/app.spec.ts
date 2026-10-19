@@ -462,3 +462,102 @@ test('Attendance phase 2: teams and default hours, breaks, the exception queue a
     await expect(zinia).toHaveURL(/error=admins-only/);
   }
 });
+
+// The next date (at least `min` days ahead) that falls on an ISO weekday (1 = Monday … 7 = Sunday).
+function nextIsoDay(isoDow: number, min = 1) {
+  for (let i = min; i < min + 7; i++) {
+    const d = isoIn(i);
+    const dow = new Date(`${d}T00:00:00Z`).getUTCDay() || 7;
+    if (dow === isoDow) return d;
+  }
+  throw new Error('unreachable');
+}
+
+test('Phase 3: company branding, logo, daily quotes and weekly-off swaps', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+
+  // Branding: unreadable colours are refused, readable ones change the whole app
+  await admin.goto('/settings/company');
+  await expect(admin.getByRole('link', { name: 'Company & branding' })).toHaveAttribute('aria-current', 'page');
+  await admin.getByLabel('Company name').fill('Femoraah');
+  await admin.getByLabel('Tagline (optional)').fill('Ops command center');
+  await admin.getByLabel('Primary colour', { exact: true }).fill('#fde68a');
+  await expect(admin.getByText(/White text on buttons, headers and links: 1\.\d:1/)).toBeVisible();
+  await admin.getByRole('button', { name: 'Save company settings' }).click();
+  await expect(admin.getByText(/^Hard to read: white text on buttons/)).toBeVisible();
+  await admin.getByLabel('Primary colour', { exact: true }).fill('#7c2d12');
+  await admin.getByLabel('Secondary colour', { exact: true }).fill('#14532d');
+  await admin.getByLabel('Accent colour', { exact: true }).fill('#b45309');
+  await admin.getByRole('button', { name: 'Save company settings' }).click();
+  await expect(admin.getByText(/Company settings saved/)).toBeVisible();
+  await admin.getByLabel('Upload a logo').setInputFiles('tests/e2e/fixtures/logo.png');
+  await admin.getByRole('button', { name: 'Save logo' }).click();
+  await expect(admin.getByText('Logo saved.')).toBeVisible();
+  await admin.reload();
+  await expect(admin.locator('aside').getByText('Femoraah')).toBeVisible();
+  await expect(admin.locator('aside img')).toBeVisible();
+  const menuColour = await admin.locator('aside').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(menuColour).toBe('rgb(20, 83, 45)');
+  await expect(admin).toHaveTitle(/Femoraah/);
+  await admin.screenshot({ path: `${SHOTS}/20-company-branding.png`, fullPage: true });
+
+  // The sign-in page shows the brand before anyone signs in
+  const visitor = await (await browser.newContext()).newPage();
+  await visitor.goto('/login');
+  await expect(visitor.getByText('Femoraah', { exact: true })).toBeVisible();
+  await expect(visitor.getByText('Ops command center')).toBeVisible();
+  const logo = await visitor.request.get('/brand/logo');
+  expect(logo.status()).toBe(200);
+  expect(logo.headers()['content-type']).toBe('image/png');
+  expect(logo.headers()['x-content-type-options']).toBe('nosniff');
+  await visitor.screenshot({ path: `${SHOTS}/21-login-branded.png` });
+
+  // Quotes: add, archive, restore, reorder; everyone sees the same quote today
+  await admin.goto('/settings/quotes');
+  await expect(admin.getByText('In rotation (20)')).toBeVisible();
+  await admin.getByLabel('Quote', { exact: true }).fill('Ship small, ship daily.');
+  await admin.getByLabel('Author (optional)').fill('OpsPulse team');
+  await admin.getByRole('button', { name: 'Add quote' }).click();
+  await expect(admin.getByText('Quote added at the end of the list.')).toBeVisible();
+  await admin.reload();
+  const added = admin.getByRole('listitem').filter({ hasText: 'Ship small, ship daily.' });
+  await added.getByRole('button', { name: 'Archive' }).click();
+  await expect(admin.getByText('Archived (1)')).toBeVisible();
+  await admin.getByRole('listitem').filter({ hasText: 'Ship small, ship daily.' }).getByRole('button', { name: 'Restore' }).click();
+  await expect(admin.getByText('In rotation (21)')).toBeVisible();
+  const first = admin.getByRole('listitem').first();
+  await expect(first).toContainText('Well done is better than well said.');
+  await first.getByRole('button', { name: 'Move down' }).click();
+  await expect(admin.getByRole('listitem').nth(1)).toContainText('Well done is better than well said.');
+
+  const zinia = await as(browser, PEOPLE.Zinia);
+  const dev = await as(browser, PEOPLE.Dev);
+  const ziniaQuote = await zinia.locator('figure blockquote').textContent();
+  expect(ziniaQuote?.length).toBeGreaterThan(5);
+  await expect(dev.locator('figure blockquote')).toHaveText(ziniaQuote!);
+  await admin.goto('/settings/quotes');
+  await expect(admin.getByText("Today's quote")).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/22-quotes.png`, fullPage: true });
+  await zinia.screenshot({ path: `${SHOTS}/23-dashboard-quote.png` });
+  for (const path of ['/settings/company', '/settings/quotes']) {
+    await zinia.goto(path);
+    await expect(zinia).toHaveURL(/error=admins-only/);
+  }
+
+  // Weekly-off swap: Zinia works a Sunday (her weekly off) and takes the Wednesday after it off
+  const sunday = nextIsoDay(7, 1);
+  const wednesday = nextIsoDay(3, Math.round((Date.parse(sunday) - Date.parse(isoIn(0))) / 86_400_000) + 1);
+  await zinia.goto('/calendar');
+  await zinia.getByLabel('Leave type').selectOption('Holiday Swap');
+  await zinia.getByLabel('First day').fill(wednesday);
+  await zinia.getByLabel('Last day').fill(wednesday);
+  await zinia.getByLabel('Day you will work instead').selectOption('weekly');
+  // A Monday is a working day, so it cannot be swapped
+  await zinia.getByLabel('Weekly off you will work').fill(nextIsoDay(1, 1));
+  await zinia.getByRole('button', { name: 'Add leave' }).click();
+  await expect(zinia.getByText(/is not a company holiday or a weekly off for this person/)).toBeVisible();
+  await zinia.getByLabel('Weekly off you will work').fill(sunday);
+  await zinia.getByRole('button', { name: 'Add leave' }).click();
+  await expect(zinia.getByText(/Leave added: Holiday Swap/)).toBeVisible();
+  await zinia.screenshot({ path: `${SHOTS}/24-weekly-off-swap.png`, fullPage: true });
+});
