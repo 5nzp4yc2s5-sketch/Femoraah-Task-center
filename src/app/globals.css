@@ -59,3 +59,39 @@ body {
 .sheet tbody tr:hover td {
   @apply bg-navy-50/70;
 }
+
+/* Dashboard charts: bars grow in once, and panels fade in. Both are skipped when the device asks for less motion. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes bar-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.bar-grow {
+  transform-origin: bottom;
+  animation: bar-grow 500ms ease-out both;
+}
+.bar-grow-x {
+  transform-origin: left;
+  animation: bar-grow-x 500ms ease-out both;
+}
+.fade-up {
+  animation: fade-up 250ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow,
+  .bar-grow-x,
+  .fade-up {
+    animation: none;
+  }
+}

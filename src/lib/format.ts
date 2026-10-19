@@ -62,3 +62,12 @@ export function addDays(d: string, n: number): string {
 }
 
 export const isIsoDate = (v: string | undefined | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Chart labels for a yyyy-mm-dd date: { day: '14', weekday: 'Tue', title: 'Tue 14-Oct-26' }. */
+export function dayParts(d: string): { day: string; weekday: string; title: string } {
+  const [y, m, day] = d.split('-').map(Number);
+  const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, day)).getUTCDay()];
+  return { day: String(day), weekday, title: `${weekday} ${fmtDate(d)}` };
+}

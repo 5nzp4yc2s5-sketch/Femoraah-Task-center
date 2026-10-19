@@ -11,6 +11,7 @@ import { TaskTable } from '@/components/task-table';
 import { RoutineTable } from '@/components/routine-table';
 import { BreakControl } from './attendance/break-control';
 import { QuoteCard } from '@/components/quote-card';
+import { MyAttendanceTrend } from './my-attendance-trend';
 
 export const metadata = { title: 'My Dashboard' };
 
@@ -43,6 +44,12 @@ interface Activity {
   actor_name: string | null;
   kind: string;
   summary: string;
+}
+
+/** The Sunday that ends the Monday-to-Sunday week containing this date. */
+function weekEnd(d: string): string {
+  const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
+  return addDays(d, (7 - dow) % 7);
 }
 
 export default async function MyDashboard({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -78,7 +85,8 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
   const [calendar, attendance] = today
     ? await Promise.all([
         supabase.rpc('team_calendar', { p_from: today, p_to: addDays(today, 30) }),
-        supabase.rpc('attendance_days_report', { p_from: today, p_to: today, p_member: me.memberId }),
+        // Two weeks back for the trend, and to the end of this week for the week's scheduled hours.
+        supabase.rpc('attendance_days_report', { p_from: addDays(today, -13), p_to: weekEnd(today), p_member: me.memberId }),
       ])
     : [null, null];
   const upcoming30 = (calendar?.data ?? []) as CalendarEntry[];
@@ -227,6 +235,11 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
               )}
               {attendanceToday.pending_correction && <p className="mt-3 text-xs text-slate-600">You have a correction request waiting for review.</p>}
               <p className="mt-3 text-xs text-slate-500">Times are recorded by the server when you sign in and out (shown in {attendanceToday.tz}).</p>
+            </div>
+          )}
+          {today && !attendance?.error && (attendance?.data ?? []).length > 0 && (
+            <div className="mt-3">
+              <MyAttendanceTrend rows={(attendance?.data ?? []) as AttendanceRow[]} today={today} memberId={me.memberId} />
             </div>
           )}
         </section>

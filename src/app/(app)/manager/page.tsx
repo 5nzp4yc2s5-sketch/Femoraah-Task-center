@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { requireManager } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers, routinesFor, sortTasks } from '@/lib/data';
@@ -8,6 +9,8 @@ import { PageHeader, SectionTitle, StatCard, Notice, EmptyState } from '@/compon
 import { CapacityBadge, FlaggedStar, PriorityBadge, StatusBadge } from '@/components/badges';
 import { TaskTable } from '@/components/task-table';
 import { RoutineTable } from '@/components/routine-table';
+import { AttendanceOverview, AttendanceOverviewSkeleton } from './attendance-overview';
+import { TaskTrend } from './task-trend';
 
 export const metadata = { title: 'Dashboard' };
 
@@ -203,9 +206,27 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
     <>
       <PageHeader
         title="Dashboard"
-        subtitle={<>Manager view. Updates automatically from the Task Board, Pending Backlog and Routine Tasks. Today is {fmtDate(d.today)}.</>}
+        subtitle={<>Manager view. Updates automatically from attendance, the Task Board, Pending Backlog and Routine Tasks. Today is {fmtDate(d.today)}.</>}
+        actions={
+          <>
+            <Link href="/tasks/new" className="btn-primary">New task</Link>
+            <Link href="/backlog" className="btn-secondary">
+              Pending Backlog
+              {d.unassigned_backlog > 0 && <span className="rounded-full bg-accent px-1.5 text-xs font-semibold tabular-nums text-white">{d.unassigned_backlog}</span>}
+            </Link>
+          </>
+        }
       />
 
+      {me.areas.attendance && (
+        <div className="mb-8">
+          <Suspense fallback={<AttendanceOverviewSkeleton />}>
+            <AttendanceOverview />
+          </Suspense>
+        </div>
+      )}
+
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-navy-800">Tasks and routines</h2>
       <form className="card mb-4 grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-7" role="search" aria-label="Dashboard filters">
         <div>
           <label className="label" htmlFor="f-member">Employee</label>
@@ -287,6 +308,10 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
           href={qs('/routines', { ...routineFilters, status: 'Overdue' })}
         />
       </div>
+      <SectionTitle>Tasks added and done, last 14 days{selectedName ? ` (${selectedName})` : ''}</SectionTitle>
+      <Suspense fallback={<div className="h-52 animate-pulse rounded-xl bg-slate-200" aria-busy="true" aria-label="Loading task trend" />}>
+        <TaskTrend today={d.today} timezone={me.timezone} member={member} />
+      </Suspense>
       {d.open_data_issues > 0 && (
         <div className="mt-4">
           <Notice tone="warn">

@@ -836,3 +836,60 @@ test('Phase 4b: shared logins with PIN-checked show and copy, access managers an
   await expect(zphone.locator('main ul').getByText('Amazon Seller Central', { exact: true })).toBeVisible();
   await zphone.screenshot({ path: `${SHOTS}/32-credentials-mobile.png`, fullPage: true });
 });
+
+test('Phase 5: attendance at a glance on the dashboards, with filters, trends and quick actions', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+  await admin.goto('/manager');
+  const overview = admin.locator('section[aria-labelledby="att-today"]');
+  await expect(overview.getByRole('heading', { name: 'Attendance today' })).toBeVisible();
+  const card = (label: string) => overview.locator('a > .card', { hasText: label }).first();
+  await expect(card('Present')).toContainText('/');
+  await expect(card('Open exceptions')).toBeVisible();
+
+  // Who is in: everyone with hours today, filterable by state and team without a reload
+  const board = overview.locator('.card', { has: admin.getByRole('group', { name: 'Show' }) });
+  const everyone = await board.locator('ul > li').count();
+  expect(everyone).toBeGreaterThan(0);
+  await expect(board.getByRole('link', { name: /Kartik/ })).toBeVisible();
+  await board.getByRole('button', { name: /^Working · / }).click();
+  await expect(board.getByRole('button', { name: /^Working · / })).toHaveAttribute('aria-pressed', 'true');
+  await expect(board.getByRole('link', { name: /Kartik/ })).toBeVisible();
+  expect(await board.locator('ul > li').count()).toBeLessThanOrEqual(everyone);
+  await board.getByRole('button', { name: /^Everyone · / }).click();
+  await board.getByRole('group', { name: 'Team' }).getByRole('button', { name: 'Warehouse' }).click();
+  await expect(board.getByRole('link', { name: /Zinia/ })).toBeVisible();
+  await expect(board.getByRole('link', { name: /Kartik/ })).toHaveCount(0);
+  await board.getByRole('group', { name: 'Team' }).getByRole('button', { name: 'All teams' }).click();
+
+  // Two weeks of sign-ins: one described, clickable bar per day, today included
+  const trend = overview.getByRole('figure', { name: /Sign-ins per day over the last 14 days/ });
+  await expect(trend.getByRole('listitem').filter({ has: admin.locator('a') })).toHaveCount(14);
+  const todayBar = trend.getByRole('link', { name: /Today, so far/ });
+  await expect(todayBar).toHaveAttribute('href', /\/attendance\?from=\d{4}-\d{2}-\d{2}$/);
+  await expect(todayBar).toHaveAttribute('aria-label', /\d+ on time, \d+ late, \d+ not signed in, \d+ on leave/);
+  await expect(overview.getByRole('link', { name: 'Warehouse', exact: true })).toHaveAttribute('href', /\/attendance\?team=/);
+  await expect(admin.getByRole('figure', { name: /Tasks added and done per day/ })).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/34-dashboard-attendance.png`, fullPage: true });
+
+  // Quick action goes straight to the exceptions queue
+  await overview.getByRole('navigation', { name: 'Quick actions' }).getByRole('link', { name: /Review exceptions/ }).click();
+  await expect(admin.getByRole('heading', { name: 'Attendance exceptions' })).toBeVisible();
+
+  // Shruti is an Admin without the Attendance area: the task dashboard only
+  const shruti = await as(browser, PEOPLE.Shruti);
+  await shruti.goto('/manager');
+  await expect(shruti.getByRole('heading', { name: 'Tasks and routines' })).toBeVisible();
+  await expect(shruti.getByRole('heading', { name: 'Attendance today' })).toHaveCount(0);
+
+  // Zinia sees her own two weeks and this week's hours on her dashboard, on a phone
+  const zinia = await as(browser, PEOPLE.Zinia, true);
+  await expect(zinia.getByText('Last 14 days')).toBeVisible();
+  await expect(zinia.getByText('This week')).toBeVisible();
+  await expect(zinia.locator('ol a[aria-label]').filter({ hasText: /\d/ })).toHaveCount(14);
+  await zinia.screenshot({ path: `${SHOTS}/35-my-dashboard-mobile.png`, fullPage: true });
+
+  const phone = await as(browser, ADMIN, true);
+  await phone.goto('/manager');
+  await expect(phone.getByRole('heading', { name: 'Attendance today' })).toBeVisible();
+  await phone.screenshot({ path: `${SHOTS}/36-dashboard-mobile.png`, fullPage: true });
+});
