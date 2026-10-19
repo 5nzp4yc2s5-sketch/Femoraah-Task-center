@@ -63,6 +63,7 @@ export async function resetData(): Promise<void> {
     delete from public.attendance_breaks; delete from public.attendance_exemptions;
     delete from public.attendance_flags; delete from public.attendance_corrections;
     delete from public.attendance_sessions; delete from public.attendance_records;
+    delete from public.credential_events; delete from public.credential_access; delete from public.credential_secrets; delete from public.credentials;
     delete from public.admin_area_grants; delete from public.work_sheets;
     delete from public.member_teams; delete from public.schedule_defaults; delete from public.teams;
     delete from public.quote_days; delete from public.company_profile;

@@ -136,7 +136,7 @@ describe('admin areas', () => {
       select fn, def like '%private.has_area(%' as has_area, def like '%private.is_admin()%' as is_admin
         from (select p.proname as fn, case when p.prokind = 'f' then pg_get_functiondef(p.oid) end as def
                 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-               where n.nspname = 'public' and p.proname not like 'sheet\\_%') x
+               where n.nspname = 'public' and p.proname not like 'sheet\\_%' and p.proname not like 'cred\\_%') x
        where def like '%private.has_area(%'`);
     expect(rows).toHaveLength(24);
     expect(rows.every((r) => r.has_area && !r.is_admin)).toBe(true);

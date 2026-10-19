@@ -685,3 +685,154 @@ test('Phase 4: Admin role with admin areas, and the Google Sheets workspace', as
   await expect(admin.getByText(/Removed from the workspace by Kartik/)).toBeVisible();
   await expect(admin.getByText(/Added by Kartik/)).toBeVisible();
 });
+
+test('Phase 4b: shared logins with PIN-checked show and copy, access managers and history', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const admin = await as(browser, ADMIN);
+  const shruti = await as(browser, PEOPLE.Shruti);
+
+  // Shruti is an Admin without the Credentials area: she cannot add logins and sees none
+  await shruti.goto('/credentials');
+  await expect(shruti.getByText('No logins shared with you')).toBeVisible();
+  await shruti.goto('/credentials/new');
+  await expect(shruti).toHaveURL(/error=admins-only/);
+
+  // The Super Admin saves a login. The password never appears in the page.
+  await admin.goto('/credentials');
+  await admin.getByRole('link', { name: 'Add a login' }).first().click();
+  await expect(admin).toHaveURL(/\/credentials\/new$/);
+  await admin.getByLabel('Name', { exact: true }).fill('Amazon Seller Central');
+  await admin.getByLabel('Category').fill('Marketplaces');
+  await admin.getByLabel('Website').fill('https://sellercentral.amazon.in/');
+  await admin.getByLabel('Username or email').fill('ops@femoraah.example');
+  await admin.getByLabel('Password', { exact: true }).fill('S3cret-Pass!42');
+  await admin.getByLabel(/^Notes/).fill('One-time codes go to the ops phone.');
+  await admin.getByRole('button', { name: 'Save login' }).click();
+  await expect(admin.getByText(/Login saved and encrypted/)).toBeVisible();
+  await expect(admin.getByRole('heading', { name: 'Amazon Seller Central' })).toBeVisible();
+  expect(await admin.content()).not.toContain('S3cret-Pass!42');
+  const credUrl = admin.url().replace(/\?.*$/, '');
+
+  // Shared with the Warehouse team (Zinia is in it) to use, and with Shruti as access manager
+  await admin.getByLabel('Share with').selectOption({ label: 'Warehouse team' });
+  await admin.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(admin.getByText('Everyone in the team can show and copy')).toBeVisible();
+  await admin.getByLabel('Share with').selectOption({ label: 'Shruti' });
+  await admin.getByLabel('Access', { exact: true }).selectOption('manage');
+  await admin.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(admin.getByText('Access manager: can show, copy, change and share')).toBeVisible();
+  await admin.goto('/credentials');
+  await expect(admin.locator('table').getByRole('row', { name: /Amazon Seller Central/ })).toContainText('1 person, 1 team');
+  await admin.screenshot({ path: `${SHOTS}/29-credentials.png`, fullPage: true });
+
+  // Zinia can use it through her team: a wrong PIN is refused and counted, the right one shows it
+  const zctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const zinia = await zctx.newPage();
+  await signIn(zinia, PEOPLE.Zinia);
+  await zinia.goto('/credentials');
+  await expect(zinia.locator('table').getByRole('row', { name: /Amazon Seller Central/ })).toContainText('Can use');
+  await zinia.locator('table').getByRole('link', { name: 'Amazon Seller Central' }).click();
+  await expect(zinia.getByRole('heading', { name: 'Amazon Seller Central' })).toBeVisible();
+  await expect(zinia.getByRole('heading', { name: 'Who can use it' })).toHaveCount(0);
+  await expect(zinia.getByRole('heading', { name: 'History' })).toHaveCount(0);
+  await expect(zinia.getByRole('button', { name: 'Save new password' })).toHaveCount(0);
+  await zinia.getByRole('button', { name: 'Show password' }).click();
+  const zdlg = zinia.getByRole('dialog');
+  await zdlg.getByLabel('Your PIN').fill('999');
+  await zdlg.getByRole('button', { name: 'Show', exact: true }).click();
+  await expect(zdlg.getByRole('alert')).toContainText('Wrong PIN. 4 tries left');
+  await zdlg.getByLabel('Your PIN').fill(PEOPLE.Zinia.pin);
+  await zdlg.getByRole('button', { name: 'Show', exact: true }).click();
+  await expect(zdlg.getByTestId('revealed-password')).toHaveText('S3cret-Pass!42');
+  await expect(zdlg.getByText('One-time codes go to the ops phone.')).toBeVisible();
+  await expect(zdlg.getByRole('button', { name: 'Edit notes' })).toHaveCount(0);
+  await zinia.screenshot({ path: `${SHOTS}/30-credential-shown.png` });
+  await zdlg.getByRole('button', { name: 'Hide' }).click();
+  await expect(zinia.getByTestId('revealed-password')).toHaveCount(0);
+  await zinia.getByRole('button', { name: 'Copy password' }).click();
+  await zdlg.getByLabel('Your PIN').fill(PEOPLE.Zinia.pin);
+  await zdlg.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(zinia.getByText('Password copied. The clipboard is cleared in 30 seconds.')).toBeVisible();
+  expect(await zinia.evaluate(() => navigator.clipboard.readText())).toBe('S3cret-Pass!42');
+
+  // Dev has no access, even with the link
+  const dev = await as(browser, PEOPLE.Dev);
+  await dev.goto('/credentials');
+  await expect(dev.getByText('No logins shared with you')).toBeVisible();
+  await dev.goto(credUrl);
+  await expect(dev.getByRole('heading', { name: 'Not found' })).toBeVisible();
+
+  // Shruti, as access manager, saves a new password and shares it with Dev, but cannot make managers
+  await shruti.goto('/credentials');
+  await expect(shruti.locator('table').getByRole('row', { name: /Amazon Seller Central/ })).toContainText('Access manager');
+  await shruti.goto(credUrl);
+  await expect(shruti.getByLabel('Access', { exact: true })).toHaveCount(0);
+  await shruti.getByLabel('New password').fill('N3w-Pass!77');
+  await shruti.locator('#change-pin').fill(PEOPLE.Shruti.pin);
+  await shruti.getByRole('button', { name: 'Save new password' }).click();
+  await expect(shruti.getByText(/Password saved\. This changes only the copy kept here/)).toBeVisible();
+  await shruti.getByLabel('Share with').selectOption({ label: 'Dev' });
+  await shruti.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(shruti.getByText('Access saved.')).toBeVisible();
+  await dev.goto(credUrl);
+  await expect(dev.getByRole('heading', { name: 'Amazon Seller Central' })).toBeVisible();
+
+  // Deactivating Dev removes his access for good; reactivating him does not bring it back
+  await admin.goto('/team');
+  await admin.getByRole('link', { name: 'Dev', exact: true }).click();
+  await admin.getByRole('button', { name: 'Deactivate member' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Deactivate' }).click();
+  await expect(admin.getByRole('button', { name: 'Reactivate member' })).toBeVisible();
+  await admin.getByRole('button', { name: 'Reactivate member' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Reactivate' }).click();
+  await expect(admin.getByRole('button', { name: 'Deactivate member' })).toBeVisible();
+  const devAgain = await as(browser, PEOPLE.Dev);
+  await devAgain.goto(credUrl);
+  await expect(devAgain.getByRole('heading', { name: 'Not found' })).toBeVisible();
+
+  // The Super Admin sees the new password, edits the notes, and reads the full history
+  await admin.goto(credUrl);
+  await expect(admin.getByText(/by Shruti/).first()).toBeVisible();
+  await admin.getByRole('button', { name: 'Show password' }).click();
+  const adlg = admin.getByRole('dialog');
+  await adlg.getByLabel('Your PIN').fill(ADMIN.pin);
+  await adlg.getByRole('button', { name: 'Show', exact: true }).click();
+  await expect(adlg.getByTestId('revealed-password')).toHaveText('N3w-Pass!77');
+  await adlg.getByRole('button', { name: 'Edit notes' }).click();
+  await adlg.getByLabel('Notes').fill('One-time codes go to the ops phone. Ask Shruti.');
+  await adlg.getByRole('button', { name: 'Save notes' }).click();
+  await expect(adlg.getByText('Notes saved.')).toBeVisible();
+  await expect(adlg.getByText('One-time codes go to the ops phone. Ask Shruti.')).toBeVisible();
+  await adlg.getByRole('button', { name: 'Hide' }).click();
+  await admin.reload();
+  const history = admin.locator('section').filter({ has: admin.getByRole('heading', { name: 'History' }) });
+  for (const line of [
+    'Added by Kartik',
+    'Shared with the Warehouse team (can use) by Kartik',
+    'Shared with Shruti (access manager) by Kartik',
+    'Refused: wrong PIN (tried to show) by Zinia',
+    'Password shown by Zinia',
+    'Password copied by Zinia',
+    'Password changed by Shruti',
+    'Shared with Dev (can use) by Shruti',
+    'Access removed for Dev (account deactivated) by Kartik',
+    'Password shown by Kartik',
+    'Notes changed by Kartik',
+  ]) await expect(history).toContainText(line);
+  await admin.screenshot({ path: `${SHOTS}/31-credential-detail.png`, fullPage: true });
+
+  // Removing it from use hides it from everyone but Credentials admins; restoring brings it back
+  await admin.getByRole('button', { name: 'Remove from use' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(admin.getByText(/Removed from use on/)).toBeVisible();
+  await zinia.goto('/credentials');
+  await expect(zinia.getByText('No logins shared with you')).toBeVisible();
+  await admin.getByRole('button', { name: 'Restore login' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
+  await expect(admin.getByRole('button', { name: 'Remove from use' })).toBeVisible();
+
+  const zphone = await as(browser, PEOPLE.Zinia, true);
+  await zphone.goto('/credentials');
+  await expect(zphone.locator('main ul').getByText('Amazon Seller Central', { exact: true })).toBeVisible();
+  await zphone.screenshot({ path: `${SHOTS}/32-credentials-mobile.png`, fullPage: true });
+});

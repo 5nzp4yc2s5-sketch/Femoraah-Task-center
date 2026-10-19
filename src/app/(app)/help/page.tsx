@@ -41,8 +41,9 @@ export default async function Help() {
       <Card title="Roles">
         <ul className="list-disc space-y-1.5 pl-5">
           <li><strong>Super Admin</strong>: everything, including team members, logins, PINs and who is an Admin.</li>
-          <li><strong>Admin</strong>: sees all tasks and routines, approves the backlog and records leave for others, plus only the admin areas the Super Admin gives them on the Team page (Attendance, Company settings, Google Sheets).</li>
-          <li><strong>Employee</strong>: their own work, attendance and the sheets shared with them.</li>
+          <li><strong>Admin</strong>: sees all tasks and routines, approves the backlog and records leave for others, plus only the admin areas the Super Admin gives them on the Team page (Attendance, Company settings, Google Sheets, Credentials).</li>
+          <li><strong>Access manager</strong>: for a login they were made access manager of, can also change its saved password and share it with others.</li>
+          <li><strong>Employee</strong>: their own work, attendance, and the sheets and logins shared with them.</li>
           <li>Wherever the app says <em>manager</em>, it means an Admin or the Super Admin.</li>
         </ul>
       </Card>
@@ -55,6 +56,7 @@ export default async function Help() {
           <li><strong>Team Calendar</strong>: company holidays and who is on leave.</li>
           <li><strong>Attendance</strong>: your sign-in and sign-out times.</li>
           <li><strong>Google Sheets</strong>: links to the team&apos;s working sheets, what each is for, who is responsible and who works on it. Google still decides who can open a sheet.</li>
+          <li><strong>Credentials</strong>: shared logins for websites and tools, shown only to the people and teams they are shared with.</li>
         </ul>
       </Card>
 
@@ -130,6 +132,11 @@ export default async function Help() {
 
       <Card title="Google Sheets">
         <p>The <Link href="/sheets" className="text-navy-700 underline">Google Sheets</Link> page lists the team&apos;s sheets with search, filters by team, category and person, and sorting. Select <strong>Open sheet</strong> to open it in Google Sheets. A Sheets admin adds, edits and removes entries; the responsible person can update an entry&apos;s details and who works on it. Removed entries are kept and can be restored. Only the link is stored here, never the sheet&apos;s contents.</p>
+      </Card>
+
+      <Card title="Credentials">
+        <p>The <Link href="/credentials" className="text-navy-700 underline">Credentials</Link> page lists the shared logins you can use. Passwords and notes are encrypted and stay hidden: select <strong>Show password</strong> or <strong>Copy password</strong> and enter your PIN each time. A shown password hides itself after a minute, and a copied one is cleared from the clipboard after 30 seconds. Five wrong PINs lock your account, the same as at sign-in.</p>
+        <p className="mt-2">A Credentials admin adds logins and shares them with people or teams. An <strong>access manager</strong> can also save a new password and share the login. Saving a password here only updates the copy kept in the app: change it on the website first. Every show, copy, change and share is recorded in the login&apos;s history, and access ends automatically when someone&apos;s role changes or their account is deactivated.</p>
       </Card>
 
       <Card title="Signing in">

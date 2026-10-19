@@ -16,10 +16,10 @@ export const ADMIN_AREAS: { key: AdminArea; label: string; help: string }[] = [
   { key: 'attendance', label: 'Attendance', help: 'Everyone’s attendance, exceptions, exemptions, breaks, schedules, teams and default hours.' },
   { key: 'settings', label: 'Company settings', help: 'Company name, logo, colours and motivational quotes.' },
   { key: 'sheets', label: 'Google Sheets', help: 'Add, change and remove sheets in the Sheets workspace.' },
-  { key: 'credentials', label: 'Credentials', help: 'Every shared login in the credential manager, and who can use it.' },
+  { key: 'credentials', label: 'Credentials', help: 'Add shared logins, see and change every one, and choose who can use them.' },
 ];
 /** Areas whose screens exist in this version of the app. */
-export const LIVE_ADMIN_AREAS: AdminArea[] = ['attendance', 'settings', 'sheets'];
+export const LIVE_ADMIN_AREAS: AdminArea[] = ['attendance', 'settings', 'sheets', 'credentials'];
 
 export type TaskStatus = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
