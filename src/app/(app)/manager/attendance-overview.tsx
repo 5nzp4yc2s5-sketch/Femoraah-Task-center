@@ -84,6 +84,7 @@ export async function AttendanceOverview() {
   const expected = todayRows.filter((r) => r.day_type === 'Working Day').length;
   const present = todayRows.filter((r) => r.first_login).length;
   const lateToday = todayRows.filter((r) => r.login_status === 'Late').length;
+  const todayHoliday = todayRows.find((r) => r.day_type === 'Holiday')?.holiday_name ?? null;
 
   // Two weeks, one bar a day. Today is still in progress, so it is drawn lighter.
   const bars: Bar[] = Array.from({ length: DAYS }, (_, i) => {
@@ -161,7 +162,13 @@ export async function AttendanceOverview() {
         <Link href="/attendance" className="text-sm text-navy-700 hover:underline">Attendance →</Link>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        <StatCard label="Present" value={`${present}/${expected}`} tone={expected && present >= expected ? 'green' : 'default'} hint="Signed in of expected today" href="/attendance" />
+        <StatCard
+          label="Present"
+          value={expected ? `${present}/${expected}` : present}
+          tone={expected && present >= expected ? 'green' : 'default'}
+          hint={expected ? 'Signed in of expected today' : todayHoliday ? `Holiday: ${todayHoliday}` : 'No one is scheduled today'}
+          href="/attendance"
+        />
         <StatCard label="Working now" value={count('working')} tone={count('working') ? 'green' : 'default'} href="/attendance?status=Currently+Working" />
         <StatCard label="On a break" value={count('break')} tone={count('break') ? 'amber' : 'default'} href="/attendance#breaks" />
         <StatCard label="Late today" value={lateToday} tone={lateToday ? 'amber' : 'default'} href="/attendance?late=1" />
@@ -214,7 +221,9 @@ export async function AttendanceOverview() {
                   <div className="flex items-baseline justify-between gap-2">
                     <Link href={t.id ? `/attendance?team=${t.id}` : '/attendance'} className="font-medium text-navy-900 hover:underline">{t.name}</Link>
                     <span className="text-xs tabular-nums text-slate-600">
-                      {t.present}/{t.expected} in{t.late ? ` · ${t.late} late` : ''}{t.leave ? ` · ${t.leave} on leave` : ''}
+                      {t.expected ? `${t.present}/${t.expected} in` : t.present ? `${t.present} in, none scheduled` : 'Day off today'}
+                      {t.late ? ` · ${t.late} late` : ''}
+                      {t.leave ? ` · ${t.leave} on leave` : ''}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-3 text-xs text-slate-600">
