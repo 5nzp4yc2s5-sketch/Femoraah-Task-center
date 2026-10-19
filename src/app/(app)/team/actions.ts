@@ -150,3 +150,18 @@ export async function setActiveAction(_prev: ActionState, formData: FormData): P
   revalidatePath('/', 'layout');
   return { ok: active ? 'Member reactivated.' : 'Member deactivated. Their sessions no longer have access.' };
 }
+
+const areasSchema = z.array(z.enum(['attendance', 'settings', 'sheets', 'credentials'])).max(4);
+
+export async function setAreasAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const id = z.uuid().safeParse(formData.get('id'));
+  const areas = areasSchema.safeParse(formData.getAll('area'));
+  if (!id.success) return { error: 'Unknown member.' };
+  if (!areas.success) return { error: 'Unknown admin area.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('admin_set_areas', { p_member: id.data, p_areas: areas.data });
+  if (error) return { error: friendlyError(error.message) };
+  revalidatePath('/', 'layout');
+  return { ok: areas.data.length ? 'Admin areas saved.' : 'Admin areas removed. They keep the Admin role.' };
+}

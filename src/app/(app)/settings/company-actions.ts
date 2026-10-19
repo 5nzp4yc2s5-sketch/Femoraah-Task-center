@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { friendlyError } from '@/lib/format';
 import { brandChecks, DEFAULT_BRAND, HEX } from '@/lib/colors';
 import type { ActionState } from '@/lib/types';
@@ -14,7 +14,7 @@ const colour = z.preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase
 
 /** Company name, tagline and colours. A colour equal to the default is stored as "not set". */
 export async function saveBrandingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const parsed = z
     .object({
       company_name: z.string().trim().max(60, 'Keep the company name to 60 characters.').default(''),
@@ -46,7 +46,7 @@ export async function saveBrandingAction(_prev: ActionState, formData: FormData)
 
 /** Back to the original name and colours (the logo is kept). */
 export async function resetBrandingAction(_prev: ActionState): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const supabase = await createClient();
   const { error } = await supabase.rpc('admin_update_branding', { p_company_name: '', p_tagline: '', p_primary: '', p_secondary: '', p_accent: '' });
   if (error) return { error: friendlyError(error.message) };
@@ -55,7 +55,7 @@ export async function resetBrandingAction(_prev: ActionState): Promise<ActionSta
 }
 
 export async function uploadLogoAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const file = formData.get('logo');
   if (!(file instanceof File) || file.size === 0) return { error: 'Choose an image file.' };
   if (!LOGO_TYPES.includes(file.type)) return { error: 'The logo must be a PNG, JPEG or WebP image. SVG files are not accepted.' };
@@ -69,7 +69,7 @@ export async function uploadLogoAction(_prev: ActionState, formData: FormData): 
 }
 
 export async function removeLogoAction(_prev: ActionState): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const supabase = await createClient();
   const { error } = await supabase.rpc('admin_set_logo', { p_mime: null, p_data: null });
   if (error) return { error: friendlyError(error.message) };
@@ -84,7 +84,7 @@ const quoteFields = z.object({
 });
 
 export async function saveQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const parsed = quoteFields.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
@@ -96,7 +96,7 @@ export async function saveQuoteAction(_prev: ActionState, formData: FormData): P
 }
 
 export async function setQuoteActiveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const parsed = z.object({ id: z.uuid('Unknown quote.'), active: z.enum(['1', '0']) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const supabase = await createClient();
@@ -107,7 +107,7 @@ export async function setQuoteActiveAction(_prev: ActionState, formData: FormDat
 }
 
 export async function moveQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('settings');
   const parsed = z.object({ id: z.uuid('Unknown quote.'), dir: z.enum(['up', 'down']) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const supabase = await createClient();

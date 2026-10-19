@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { fmtDate, friendlyError } from '@/lib/format';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -20,7 +20,7 @@ interface QuoteRow {
 }
 
 export default async function QuotesPage() {
-  await requireAdmin();
+  const me = await requireArea('settings');
   const supabase = await createClient();
   const [{ today }, quotesRes, daysRes] = await Promise.all([
     dbToday(supabase),
@@ -42,7 +42,7 @@ export default async function QuotesPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle="Motivational quotes on everyone's dashboard. Everyone sees the same quote each day, and none repeats until all have been shown." />
-      <SettingsTabs current="/settings/quotes" />
+      <SettingsTabs current="/settings/quotes" areas={me.areas} />
       {(quotesRes.error || daysRes.error) && <Notice tone="error">Could not load the quotes: {friendlyError(quotesRes.error?.message ?? daysRes.error?.message)}</Notice>}
 
       <SectionTitle>Add a quote</SectionTitle>

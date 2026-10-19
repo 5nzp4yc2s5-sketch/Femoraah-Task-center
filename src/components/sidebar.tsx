@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-type Item = { href: string; label: string; icon: string; managerOnly?: boolean; adminOnly?: boolean };
+type Item = { href: string; label: string; icon: string; managerOnly?: boolean; settingsOnly?: boolean };
 
 const ITEMS: Item[] = [
   { href: '/', label: 'My Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
@@ -13,10 +13,11 @@ const ITEMS: Item[] = [
   { href: '/backlog', label: 'Pending Backlog', icon: 'M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4m16 0h-5l-1 2h-4l-1-2H4' },
   { href: '/routines', label: 'Routine Tasks', icon: 'M4 4v5h5M20 20v-5h-5M5.6 15a7 7 0 0012.3 2M18.4 9A7 7 0 006.1 7' },
   { href: '/calendar', label: 'Team Calendar', icon: 'M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z' },
+  { href: '/sheets', label: 'Google Sheets', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 10h16M4 15h16M10 4v16' },
   { href: '/attendance', label: 'Attendance', icon: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { href: '/team', label: 'Team', icon: 'M17 20h5v-2a3 3 0 00-5.4-1.8M17 20H7m10 0v-2c0-.7-.1-1.3-.4-1.8M7 20H2v-2a3 3 0 015.4-1.8M7 20v-2c0-.7.1-1.3.4-1.8m0 0a5 5 0 019.2 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
   { href: '/data-review', label: 'Data Review', icon: 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z', managerOnly: true },
-  { href: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', adminOnly: true },
+  { href: '/settings', label: 'Settings', icon: 'M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z', settingsOnly: true },
   { href: '/help', label: 'How It Works', icon: 'M8.2 9a4 4 0 017.6 1c0 2-3 2.5-3 4.5M12 18h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
@@ -40,14 +41,15 @@ export function Sidebar({
   name,
   role,
   isManager,
-  isAdmin,
+  canSettings,
   signOut,
   brand: b,
 }: {
   name: string;
   role: string;
   isManager: boolean;
-  isAdmin: boolean;
+  /** Can open Settings (attendance or company settings area). */
+  canSettings: boolean;
   signOut: () => Promise<void>;
   brand: SidebarBrand;
 }) {
@@ -57,7 +59,7 @@ export function Sidebar({
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4" aria-label="Main">
-      {ITEMS.filter((i) => (!i.managerOnly || isManager) && (!i.adminOnly || isAdmin)).map((i) => (
+      {ITEMS.filter((i) => (!i.managerOnly || isManager) && (!i.settingsOnly || canSettings)).map((i) => (
         <Link
           key={i.href}
           href={i.href}
@@ -80,7 +82,7 @@ export function Sidebar({
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">{name.slice(0, 1)}</span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-white">{name}</span>
-          <span className="block text-xs capitalize text-navy-100/70">{role} · account</span>
+          <span className="block text-xs text-navy-100/70">{role} · Account</span>
         </span>
       </Link>
       <form action={signOut}>

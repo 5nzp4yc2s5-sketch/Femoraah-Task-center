@@ -21,11 +21,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   if (!today) {
     return (
       <>
-        <PageHeader title={me.isAdmin ? 'Attendance' : 'My attendance'} />
+        <PageHeader title={me.areas.attendance ? 'Attendance' : 'My attendance'} />
         <Notice tone="error">Could not load today&apos;s date from the database ({friendlyError(error)}). Please refresh the page.</Notice>
       </>
     );
   }
   // Attendance admin is admin-only. Managers who are not admins see their own attendance, like everyone else.
-  return me.isAdmin ? <AdminAttendance sp={sp} today={today} /> : <MyAttendance me={me} today={today} correct={sp.correct} />;
+  return me.areas.attendance ? <AdminAttendance sp={sp} today={today} /> : <MyAttendance me={me} today={today} correct={sp.correct} />;
 }

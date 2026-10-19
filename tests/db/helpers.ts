@@ -63,6 +63,7 @@ export async function resetData(): Promise<void> {
     delete from public.attendance_breaks; delete from public.attendance_exemptions;
     delete from public.attendance_flags; delete from public.attendance_corrections;
     delete from public.attendance_sessions; delete from public.attendance_records;
+    delete from public.admin_area_grants; delete from public.work_sheets;
     delete from public.member_teams; delete from public.schedule_defaults; delete from public.teams;
     delete from public.quote_days; delete from public.company_profile;
     update public.app_settings set late_logout_flag_minutes = null, long_break_grace_minutes = 10, repeat_flag_count = 3;

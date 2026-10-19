@@ -38,6 +38,15 @@ export default async function Help() {
         </ul>
       </Card>
 
+      <Card title="Roles">
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li><strong>Super Admin</strong>: everything, including team members, logins, PINs and who is an Admin.</li>
+          <li><strong>Admin</strong>: sees all tasks and routines, approves the backlog and records leave for others, plus only the admin areas the Super Admin gives them on the Team page (Attendance, Company settings, Google Sheets).</li>
+          <li><strong>Employee</strong>: their own work, attendance and the sheets shared with them.</li>
+          <li>Wherever the app says <em>manager</em>, it means an Admin or the Super Admin.</li>
+        </ul>
+      </Card>
+
       <Card title="Where work lives">
         <ul className="list-disc space-y-1.5 pl-5">
           <li><strong>Task Board</strong>: work with someone assigned to it, a priority and a due date. Each task has an ID such as TSK-001.</li>
@@ -45,6 +54,7 @@ export default async function Help() {
           <li><strong>Routine Tasks</strong>: recurring work (daily, weekly, monthly every 30 days, or every N days).</li>
           <li><strong>Team Calendar</strong>: company holidays and who is on leave.</li>
           <li><strong>Attendance</strong>: your sign-in and sign-out times.</li>
+          <li><strong>Google Sheets</strong>: links to the team&apos;s working sheets, what each is for, who is responsible and who works on it. Google still decides who can open a sheet.</li>
         </ul>
       </Card>
 
@@ -116,6 +126,10 @@ export default async function Help() {
 
       <Card title="Company look and daily quote">
         <p>An admin can set the company name, logo and colours under <strong>Settings → Company &amp; branding</strong>. Colours that would make text hard to read are refused. Everyone sees the same motivational quote on their dashboard each day; an admin manages the list under <strong>Settings → Quotes</strong>.</p>
+      </Card>
+
+      <Card title="Google Sheets">
+        <p>The <Link href="/sheets" className="text-navy-700 underline">Google Sheets</Link> page lists the team&apos;s sheets with search, filters by team, category and person, and sorting. Select <strong>Open sheet</strong> to open it in Google Sheets. A Sheets admin adds, edits and removes entries; the responsible person can update an entry&apos;s details and who works on it. Removed entries are kept and can be restored. Only the link is stored here, never the sheet&apos;s contents.</p>
       </Card>
 
       <Card title="Signing in">

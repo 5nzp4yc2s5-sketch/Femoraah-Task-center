@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/session';
+import { redirect } from 'next/navigation';
+import { requireMe } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { fmtDate, friendlyError } from '@/lib/format';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -46,7 +47,8 @@ function offDays(days: number[]): string {
 }
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ team?: string | string[] }> }) {
-  await requireAdmin();
+  const me = await requireMe();
+  if (!me.areas.attendance) redirect(me.areas.settings ? '/settings/company' : '/?error=admins-only');
   const sp = await searchParams;
   const supabase = await createClient();
   const [{ today, error: todayError }, teams, overview, defaultsRes, memberTeamsRes, settingsRes] = await Promise.all([
@@ -60,7 +62,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const header = (
     <>
       <PageHeader title="Settings" subtitle="Teams, default working hours and weekly offs, and attendance rules." />
-      <SettingsTabs current="/settings" />
+      <SettingsTabs current="/settings" areas={me.areas} />
     </>
   );
   if (!today) {

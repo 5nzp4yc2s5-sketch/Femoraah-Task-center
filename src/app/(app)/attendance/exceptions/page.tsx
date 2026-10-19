@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers } from '@/lib/data';
 import { addDays, fmtDate, friendlyError } from '@/lib/format';
@@ -17,7 +17,7 @@ const MAX_DAYS = 366;
 const RECENT_DAYS = 14;
 
 export default async function ExceptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin();
+  await requireArea('attendance');
   const raw = await searchParams;
   const sp = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, one(v)])) as Record<string, string | undefined>;
   const supabase = await createClient();

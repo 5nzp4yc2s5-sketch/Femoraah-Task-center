@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { getBrand } from '@/lib/brand';
 import { DEFAULT_BRAND } from '@/lib/colors';
@@ -21,7 +21,7 @@ interface ProfileRow {
 }
 
 export default async function CompanySettingsPage() {
-  await requireAdmin();
+  const me = await requireArea('settings');
   const supabase = await createClient();
   const [{ data, error }, brand] = await Promise.all([
     supabase.from('company_profile').select('company_name, tagline, brand_primary, brand_secondary, brand_accent, updated_at').maybeSingle(),
@@ -32,7 +32,7 @@ export default async function CompanySettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle="Your company's name, logo and colours. Everyone sees them, including on the sign-in page." />
-      <SettingsTabs current="/settings/company" />
+      <SettingsTabs current="/settings/company" areas={me.areas} />
       {error && <Notice tone="error">Could not load the company settings: {friendlyError(error.message)}</Notice>}
 
       <SectionTitle>Name and colours</SectionTitle>

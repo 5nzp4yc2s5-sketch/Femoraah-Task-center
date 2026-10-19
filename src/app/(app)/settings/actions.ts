@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { friendlyError } from '@/lib/format';
 import type { ActionState } from '@/lib/types';
 import { isTimeZone, validDate } from '../attendance/lib';
@@ -14,7 +14,7 @@ const optUuid = (msg: string) => z.preprocess((v) => (v === '' || v === null || 
 
 /** Create a team, or rename / archive / restore one. */
 export async function saveTeamAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       id: optUuid('Unknown team.'),
@@ -34,7 +34,7 @@ export async function saveTeamAction(_prev: ActionState, formData: FormData): Pr
 
 /** Put a person in a team (or no team) from a date. */
 export async function setMemberTeamAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       member_id: z.uuid('Choose an employee.'),
@@ -53,7 +53,7 @@ export async function setMemberTeamAction(_prev: ActionState, formData: FormData
 
 /** Company or team default hours and weekly offs, from a date. */
 export async function setDefaultHoursAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       team_id: optUuid('Choose a team.'),
@@ -90,7 +90,7 @@ export async function setDefaultHoursAction(_prev: ActionState, formData: FormDa
 
 /** Late-logout threshold (off when empty) and the grace on top of the break allowance. */
 export async function attendanceRulesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       late_logout: z.enum(['off', 'on']),

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers } from '@/lib/data';
 import { addDays, fmtDate, friendlyError } from '@/lib/format';
@@ -40,7 +40,7 @@ function stateOf(e: Exemption, today: string): 'Active' | 'Upcoming' | 'Ended' {
 }
 
 export default async function ExemptionsPage() {
-  await requireAdmin();
+  await requireArea('attendance');
   const supabase = await createClient();
   const [{ today, error: todayError }, members, names, res] = await Promise.all([
     dbToday(supabase),

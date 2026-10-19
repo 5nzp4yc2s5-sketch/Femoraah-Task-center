@@ -31,6 +31,7 @@ export function friendlyError(message: string | undefined | null): string {
   if (/members_active_name_uq/i.test(message)) return 'An active member already has that name.';
   if (/invalid input value for enum/i.test(message)) return 'That value is not one of the allowed options.';
   if (/attendance_one_open_break/i.test(message)) return 'You are already on a break.';
+  if (/work_sheets_key_active/i.test(message)) return 'This sheet link is already in the workspace.';
   if (/break_minutes_check|grace_minutes_check/i.test(message)) return 'The break must be 0–240 minutes and the grace period 0–120 minutes.';
   return message.replace(/^.*?ERROR:\s*/, '');
 }

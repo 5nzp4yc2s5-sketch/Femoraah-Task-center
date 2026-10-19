@@ -561,3 +561,127 @@ test('Phase 3: company branding, logo, daily quotes and weekly-off swaps', async
   await expect(zinia.getByText(/Leave added: Holiday Swap/)).toBeVisible();
   await zinia.screenshot({ path: `${SHOTS}/24-weekly-off-swap.png`, fullPage: true });
 });
+
+test('Phase 4: Admin role with admin areas, and the Google Sheets workspace', async ({ browser }) => {
+  const admin = await as(browser, ADMIN);
+  const shruti = await as(browser, PEOPLE.Shruti);
+
+  // Shruti becomes an Admin with no admin areas: no Settings, no attendance admin, cannot add sheets
+  await admin.goto('/team');
+  await admin.getByRole('link', { name: 'Shruti', exact: true }).click();
+  await admin.getByLabel('Access level').selectOption('manager');
+  await admin.getByRole('button', { name: 'Save profile' }).click();
+  await expect(admin.getByText('Saved.')).toBeVisible();
+  await expect(admin.getByRole('heading', { name: 'Admin areas' })).toBeVisible();
+  await shruti.goto('/');
+  await expect(shruti.locator('aside').getByText('Admin · Account')).toBeVisible();
+  await expect(shruti.locator('aside').getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await shruti.goto('/settings');
+  await expect(shruti).toHaveURL(/error=admins-only/);
+  await shruti.goto('/attendance/exceptions');
+  await expect(shruti).toHaveURL(/error=admins-only/);
+  await shruti.goto('/sheets');
+  await expect(shruti.getByText('No sheets yet')).toBeVisible();
+  await expect(shruti.getByText('Add a sheet')).toHaveCount(0);
+  await shruti.goto('/sheets/new');
+  await expect(shruti).toHaveURL(/error=admins-only/);
+
+  // The Super Admin gives her the Google Sheets area only
+  await admin.getByLabel(/^Google Sheets/).check();
+  await admin.getByRole('button', { name: 'Save admin areas' }).click();
+  await expect(admin.getByText('Admin areas saved.')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/25-admin-areas.png`, fullPage: true });
+
+  // Shruti adds a sheet; a link that is not a Google Sheet is refused
+  await shruti.goto('/sheets');
+  await shruti.getByRole('link', { name: 'Add a sheet' }).first().click();
+  await expect(shruti).toHaveURL(/\/sheets\/new$/);
+  await shruti.getByLabel('Sheet name').fill('Daily sales tracker');
+  await shruti.getByLabel('Category').fill('Sales');
+  await shruti.getByLabel('Google Sheets link').fill('https://docs.google.com/spreadsheets/d/short');
+  await shruti.getByLabel('Purpose').fill('Orders and revenue by channel, updated every evening.');
+  await shruti.getByLabel('Responsible person', { exact: true }).selectOption({ label: 'Zinia' });
+  await shruti.getByRole('group', { name: 'Working on it' }).getByLabel('Dev').check();
+  await shruti.getByRole('button', { name: 'Add sheet' }).click();
+  await expect(shruti.getByText(/Paste the full Google Sheets link/)).toBeVisible();
+  await shruti.getByLabel('Google Sheets link').fill('https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit#gid=0');
+  await shruti.getByRole('button', { name: 'Add sheet' }).click();
+  await expect(shruti.getByText('Added Daily sales tracker.')).toBeVisible();
+  // The same link cannot be added twice
+  await shruti.getByRole('link', { name: 'Add another sheet' }).click();
+  await shruti.getByLabel('Sheet name').fill('Sales copy');
+  await shruti.getByLabel('Google Sheets link').fill('https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit');
+  await shruti.getByRole('button', { name: 'Add sheet' }).click();
+  await expect(shruti.getByText('This sheet link is already in the workspace')).toBeVisible();
+
+  // The Super Admin adds a sheet only the people on it can see
+  await admin.goto('/sheets/new');
+  await admin.getByLabel('Sheet name').fill('Payroll inputs');
+  await admin.getByLabel('Category').fill('Finance');
+  await admin.getByLabel('Google Sheets link').fill('https://docs.google.com/spreadsheets/d/1ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210/edit');
+  await admin.getByLabel('Responsible person', { exact: true }).selectOption({ label: 'Shruti' });
+  await admin.getByLabel(/^Only the responsible person/).check();
+  await admin.getByRole('button', { name: 'Add sheet' }).click();
+  await expect(admin.getByText('Added Payroll inputs.')).toBeVisible();
+  await admin.reload();
+  const table = admin.locator('table');
+  await expect(table.getByRole('row')).toHaveCount(3);
+  await expect(table.getByRole('row', { name: /Daily sales tracker/ })).toContainText('Zinia');
+  await expect(table.getByRole('row', { name: /Daily sales tracker/ })).toContainText('Dev');
+  const open = table.getByRole('row', { name: /Daily sales tracker/ }).getByRole('link', { name: /Open sheet/ });
+  await expect(open).toHaveAttribute('target', '_blank');
+  await expect(open).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(open).toHaveAttribute('href', 'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit#gid=0');
+  await admin.screenshot({ path: `${SHOTS}/26-sheets.png`, fullPage: true });
+
+  // Search, filter and sort
+  await admin.goto('/sheets?q=payroll');
+  await expect(admin.locator('table').getByRole('row')).toHaveCount(2);
+  await admin.goto('/sheets?category=Sales');
+  await expect(admin.locator('table').getByRole('row', { name: /Daily sales tracker/ })).toBeVisible();
+  await expect(admin.locator('table').getByRole('row', { name: /Payroll inputs/ })).toHaveCount(0);
+  await admin.goto('/sheets?sort=owner');
+  await expect(admin.locator('table tbody tr').first()).toContainText('Payroll inputs');
+
+  // Zinia (an Employee) sees the shared sheet but not the restricted one, and can edit the one she is responsible for
+  const zinia = await as(browser, PEOPLE.Zinia);
+  await zinia.goto('/sheets');
+  await expect(zinia.locator('table').getByRole('row', { name: /Daily sales tracker/ })).toBeVisible();
+  await expect(zinia.getByText('Payroll inputs')).toHaveCount(0);
+  await expect(zinia.getByText('Add a sheet')).toHaveCount(0);
+  await zinia.locator('table').getByRole('link', { name: 'Daily sales tracker' }).click();
+  await expect(zinia.getByRole('heading', { name: 'Daily sales tracker' })).toBeVisible();
+  await expect(zinia.getByLabel('Responsible person', { exact: true })).toHaveValue('Zinia');
+  await expect(zinia.getByLabel('Responsible person', { exact: true })).not.toBeEditable();
+  await zinia.getByLabel('Purpose').fill('Orders and revenue by channel. Zinia updates it by 7 pm.');
+  await zinia.getByRole('button', { name: 'Save sheet' }).click();
+  await expect(zinia.getByText('Saved.')).toBeVisible();
+  await expect(zinia.getByRole('button', { name: 'Remove from workspace' })).toHaveCount(0);
+  await zinia.screenshot({ path: `${SHOTS}/27-sheet-owner-edit.png`, fullPage: true });
+
+  // Dev works on it but is not responsible: he can read it but not change it
+  const dev = await as(browser, PEOPLE.Dev, true);
+  await dev.goto('/sheets');
+  await expect(dev.locator('main ul').getByText('Daily sales tracker', { exact: true })).toBeVisible();
+  await expect(dev.getByRole('link', { name: 'Daily sales tracker' })).toHaveCount(0);
+  await dev.screenshot({ path: `${SHOTS}/28-sheets-mobile.png`, fullPage: true });
+  const sheetUrl = zinia.url();
+  await dev.goto(sheetUrl);
+  await expect(dev.getByText('Zinia updates it by 7 pm.')).toBeVisible();
+  await expect(dev.getByRole('button', { name: 'Save sheet' })).toHaveCount(0);
+
+  // Remove and restore keep the entry and its history
+  await admin.goto('/sheets');
+  await admin.locator('table').getByRole('link', { name: 'Payroll inputs' }).click();
+  await admin.getByRole('button', { name: 'Remove from workspace' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
+  await expect(admin.getByText(/Removed from the workspace on/)).toBeVisible();
+  await admin.goto('/sheets?removed=1');
+  await admin.locator('table').getByRole('link', { name: 'Payroll inputs' }).click();
+  await admin.getByRole('button', { name: 'Restore sheet' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
+  await expect(admin.getByRole('button', { name: 'Remove from workspace' })).toBeVisible();
+  await expect(admin.getByText(/Restored by Kartik/)).toBeVisible();
+  await expect(admin.getByText(/Removed from the workspace by Kartik/)).toBeVisible();
+  await expect(admin.getByText(/Added by Kartik/)).toBeVisible();
+});

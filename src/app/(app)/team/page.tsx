@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requireMe } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { fmtDate, friendlyError } from '@/lib/format';
-import type { TeamRow } from '@/lib/types';
+import { ROLE_LABELS, type TeamRow } from '@/lib/types';
 import { PageHeader, Notice, EmptyState } from '@/components/ui';
 import { Avatar, CapacityBadge } from '@/components/badges';
 
@@ -67,7 +67,7 @@ export default async function Team({ searchParams }: { searchParams: Promise<{ s
       m.name
     );
   const roleTag = (m: TeamRow) =>
-    m.access_role !== 'member' && <span className="ml-2 rounded bg-navy-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-navy-800">{m.access_role}</span>;
+    m.access_role !== 'member' && <span className="ml-2 rounded bg-navy-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-navy-800">{ROLE_LABELS[m.access_role]}</span>;
   const status = (m: TeamRow) =>
     !m.is_active ? (
       <span className="text-slate-500">Deactivated</span>

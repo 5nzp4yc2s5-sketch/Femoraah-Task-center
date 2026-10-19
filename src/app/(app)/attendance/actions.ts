@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { requireAdmin, requireMe } from '@/lib/session';
+import { requireArea, requireMe } from '@/lib/session';
 import { friendlyError } from '@/lib/format';
 import type { ActionState } from '@/lib/types';
 import { DECISIONS, isTimeZone, validDate } from './lib';
@@ -60,7 +60,7 @@ export async function requestCorrectionAction(_prev: ActionState, formData: Form
 
 /** Admin: approve or reject a correction request. */
 export async function decideCorrectionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       id: z.uuid('Unknown request.'),
@@ -79,7 +79,7 @@ export async function decideCorrectionAction(_prev: ActionState, formData: FormD
 
 /** Admin: set a schedule from a date (today or later). Past days keep the schedule they had. */
 export async function setScheduleAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       member_id: z.uuid('Choose an employee.'),
@@ -116,7 +116,7 @@ export async function setScheduleAction(_prev: ActionState, formData: FormData):
 
 /** Admin: approve, reject or waive one or many exceptions. Already-decided ones are skipped. */
 export async function decideFlagsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       ids: z.array(z.uuid('Unknown exception.')).min(1, 'Select at least one exception.').max(500, 'Decide up to 500 exceptions at a time.'),
@@ -139,7 +139,7 @@ export async function decideFlagsAction(_prev: ActionState, formData: FormData):
 
 /** Admin: reopen a decided exception (its decision is cleared; the history keeps it). */
 export async function reopenFlagAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({ id: z.uuid('Unknown exception.'), note: z.string().trim().max(1000, 'Keep the note under 1000 characters.').default('') })
     .safeParse(Object.fromEntries(formData));
@@ -195,7 +195,7 @@ export async function addBreakAction(_prev: ActionState, formData: FormData): Pr
 
 /** Admin: remove a break from the calculations (the record is kept, marked as removed). */
 export async function voidBreakAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({ id: z.uuid('Unknown break.'), note: z.string().trim().min(3, 'Say why the break is being removed.').max(500, 'Keep the note under 500 characters.') })
     .safeParse(Object.fromEntries(formData));
@@ -209,7 +209,7 @@ export async function voidBreakAction(_prev: ActionState, formData: FormData): P
 
 /** Admin: exempt someone from late / early / long-break flags, permanently or for dates. */
 export async function addExemptionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({
       member_id: z.uuid('Choose an employee.'),
@@ -230,7 +230,7 @@ export async function addExemptionAction(_prev: ActionState, formData: FormData)
 
 /** Admin: switch an exemption off from tomorrow. */
 export async function endExemptionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({ id: z.uuid('Unknown exemption.'), note: z.string().trim().max(500, 'Keep the note under 500 characters.').default('') })
     .safeParse(Object.fromEntries(formData));
@@ -244,7 +244,7 @@ export async function endExemptionAction(_prev: ActionState, formData: FormData)
 
 /** Admin: from a date, take the person's hours from their team or company default. */
 export async function followDefaultAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea('attendance');
   const parsed = z
     .object({ member_id: z.uuid('Choose an employee.'), effective_from: dateField('Choose the date to start from.') })
     .safeParse(Object.fromEntries(formData));

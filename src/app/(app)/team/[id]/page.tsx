@@ -3,11 +3,11 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { fmtDate, friendlyError } from '@/lib/format';
-import type { TeamRow } from '@/lib/types';
+import { ADMIN_AREAS, LIVE_ADMIN_AREAS, type TeamRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { Notice, SectionTitle, StatCard } from '@/components/ui';
 import { Avatar, CapacityBadge } from '@/components/badges';
-import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, updateMemberAction } from '../actions';
+import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, setAreasAction, updateMemberAction } from '../actions';
 import { LoginFields, MemberFields } from '../fields';
 
 export const metadata = { title: 'Team member' };
@@ -18,10 +18,12 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const me = await requireAdmin();
   const supabase = await createClient();
-  const [{ data: team, error }, { data: raw }] = await Promise.all([
+  const [{ data: team, error }, { data: raw }, { data: grants }] = await Promise.all([
     supabase.rpc('team_overview'),
     supabase.from('members').select('accepts_unmatched').eq('id', id).maybeSingle(),
+    supabase.from('admin_area_grants').select('area, granted_at').eq('member_id', id).is('revoked_at', null),
   ]);
+  const granted = new Set((grants ?? []).map((g) => g.area as string));
   if (error) {
     return (
       <div className="max-w-3xl space-y-6">
@@ -71,6 +73,31 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
         <MemberFields m={{ ...m, accepts_unmatched: raw.accepts_unmatched }} />
         <div className="flex justify-end"><SubmitButton>Save profile</SubmitButton></div>
       </ActionForm>
+
+      {m.access_role === 'manager' && m.is_active && (
+        <section className="card p-5">
+          <SectionTitle>Admin areas</SectionTitle>
+          <p className="mb-3 text-sm text-slate-600">
+            {m.name} is an Admin. Choose which admin areas they can manage. Team members, logins and PINs stay with the Super Admin.
+          </p>
+          <ActionForm action={setAreasAction} className="space-y-3">
+            <input type="hidden" name="id" value={m.member_id} />
+            <fieldset className="space-y-2">
+              <legend className="sr-only">Admin areas for {m.name}</legend>
+              {ADMIN_AREAS.filter((a) => LIVE_ADMIN_AREAS.includes(a.key)).map((a) => (
+                <label key={a.key} className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="area" value={a.key} defaultChecked={granted.has(a.key)} className="mt-0.5" />
+                  <span>
+                    <span className="font-medium text-navy-900">{a.label}</span>
+                    <span className="block text-xs text-slate-500">{a.help}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+            <div className="flex justify-end"><SubmitButton>Save admin areas</SubmitButton></div>
+          </ActionForm>
+        </section>
+      )}
 
       <section className="card p-5">
         <SectionTitle>Login</SectionTitle>

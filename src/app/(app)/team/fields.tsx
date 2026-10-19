@@ -28,9 +28,9 @@ export function MemberFields({ m }: { m?: Partial<TeamRow> & { accepts_unmatched
       <div>
         <label className="label" htmlFor="access_role">Access level</label>
         <select id="access_role" name="access_role" className="input" defaultValue={m?.access_role ?? 'member'}>
-          <option value="member">Member: own dashboard and tasks</option>
-          <option value="manager">Manager: team overview, approves backlog</option>
-          <option value="admin">Admin: manager + team and logins</option>
+          <option value="member">Employee: own dashboard, tasks and attendance</option>
+          <option value="manager">Admin: team overview, approves backlog, plus any admin areas given below</option>
+          <option value="admin">Super Admin: everything, including team, logins and admin areas</option>
         </select>
       </div>
       <label className="flex items-center gap-2 text-sm sm:col-span-2">

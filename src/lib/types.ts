@@ -7,6 +7,20 @@ export const BACKLOG_STATUSES = ['Pending', 'Approved', 'Converted to Task', 'Di
 export const ROUTINE_STATUSES = ['OK', 'Due Today', 'Overdue', 'Not Logged', 'Paused'] as const;
 export const LEAVE_TYPES = ['Annual Leave', 'Sick Leave', 'Casual Leave', 'Holiday Swap', 'Other'] as const;
 
+/** Stored roles keep their values; people see these names. */
+export type AccessRole = 'admin' | 'manager' | 'member';
+export const ROLE_LABELS: Record<AccessRole, string> = { admin: 'Super Admin', manager: 'Admin', member: 'Employee' };
+
+export type AdminArea = 'attendance' | 'settings' | 'sheets' | 'credentials';
+export const ADMIN_AREAS: { key: AdminArea; label: string; help: string }[] = [
+  { key: 'attendance', label: 'Attendance', help: 'Everyone’s attendance, exceptions, exemptions, breaks, schedules, teams and default hours.' },
+  { key: 'settings', label: 'Company settings', help: 'Company name, logo, colours and motivational quotes.' },
+  { key: 'sheets', label: 'Google Sheets', help: 'Add, change and remove sheets in the Sheets workspace.' },
+  { key: 'credentials', label: 'Credentials', help: 'Every shared login in the credential manager, and who can use it.' },
+];
+/** Areas whose screens exist in this version of the app. */
+export const LIVE_ADMIN_AREAS: AdminArea[] = ['attendance', 'settings', 'sheets'];
+
 export type TaskStatus = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type Flag = (typeof FLAGS)[number];

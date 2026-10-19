@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/session';
+import { requireArea } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { activeMembers } from '@/lib/data';
 import { fmtDate, friendlyError } from '@/lib/format';
@@ -14,7 +14,7 @@ import { DAY_LABELS, DEFAULT_TZ, UUID_RE, daysLabel, hhmm, scheduleOn, timeZoneO
 export const metadata = { title: 'Work schedules' };
 
 export default async function SchedulesPage({ searchParams }: { searchParams: Promise<{ member?: string | string[] }> }) {
-  await requireAdmin();
+  await requireArea('attendance');
   const sp = await searchParams;
   const supabase = await createClient();
   const [{ today, error: todayError }, members, schedules, names, overview] = await Promise.all([
