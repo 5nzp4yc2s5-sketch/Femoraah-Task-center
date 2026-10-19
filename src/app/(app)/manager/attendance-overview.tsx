@@ -15,7 +15,10 @@ const TREND: Series[] = [
   { key: 'late', label: 'Late', className: 'bg-amber-400' },
   { key: 'absent', label: 'Not signed in', className: 'bg-red-400' },
   { key: 'leave', label: 'On leave', className: 'bg-violet-400' },
+  { key: 'dayOff', label: 'Worked a day off', className: 'bg-sky-400' },
 ];
+
+const OFF_DAYS = new Set(['Weekly Off', 'Holiday', 'No Schedule']);
 
 function stateOf(r: AttendanceRow): PresenceState {
   if (r.on_break) return 'break';
@@ -88,7 +91,7 @@ export async function AttendanceOverview() {
     const dayRows = rows.filter((r) => r.work_date === d);
     const worked = dayRows.filter((r) => r.first_login);
     const holiday = dayRows.find((r) => r.day_type === 'Holiday')?.holiday_name;
-    const allOff = dayRows.length > 0 && dayRows.every((r) => r.day_type === 'Weekly Off' || r.day_type === 'Holiday' || r.day_type === 'No Schedule');
+    const allOff = dayRows.length > 0 && dayRows.every((r) => OFF_DAYS.has(r.day_type));
     const avg = worked.length ? Math.round(worked.reduce((n, r) => n + r.worked_minutes, 0) / worked.length) : null;
     const notes = [
       d === today ? 'Today, so far' : null,
@@ -106,6 +109,7 @@ export async function AttendanceOverview() {
         late: dayRows.filter((r) => r.login_status === 'Late').length,
         absent: dayRows.filter((r) => r.login_status === 'Not Logged In').length,
         leave: dayRows.filter((r) => r.day_type === 'On Leave').length,
+        dayOff: dayRows.filter((r) => r.first_login && OFF_DAYS.has(r.day_type)).length,
       },
       note: notes.join(' · ') || undefined,
       href: `/attendance?from=${d}`,
@@ -195,7 +199,7 @@ export async function AttendanceOverview() {
               <span className="text-slate-600">On time <strong className="tabular-nums text-navy-900">{onTimeRate}</strong></span>
               <span className="text-slate-600">Average day <strong className="tabular-nums text-navy-900">{avgHours}</strong></span>
             </div>
-            <BarChart bars={bars} series={TREND} label="Sign-ins per day over the last 14 days: on time, late, not signed in and on leave" />
+            <BarChart bars={bars} series={TREND} label="Sign-ins per day over the last 14 days: on time, late, not signed in, on leave and worked a day off" />
             <Legend series={TREND} />
           </div>
         </section>

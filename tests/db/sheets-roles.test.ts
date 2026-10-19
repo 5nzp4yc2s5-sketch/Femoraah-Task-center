@@ -83,7 +83,7 @@ describe('admin areas', () => {
     expect((await s.rpc('admin_set_pin', { p_member: ids.Dev, p_pin: '999' })).error?.code).toBe('42501');
 
     const audit = await sql<{ details: { added: string[] } }>(
-      `select details from public.audit_events where action = 'admin_areas_changed' and entity_id = $1`, [ids.Shruti]);
+      `select details from public.audit_events where action = 'admin_areas_changed' and entity_id = $1 order by created_at desc, id desc limit 1`, [ids.Shruti]);
     expect(audit[0].details.added).toEqual(['attendance']);
   });
 

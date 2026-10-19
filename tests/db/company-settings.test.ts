@@ -128,8 +128,9 @@ describe('company profile and branding', () => {
 
 describe('daily quotes', () => {
   it('ships with 20 starter quotes', async () => {
-    // The later tests replace the starter set, so this only applies to a freshly migrated database.
-    if ((await sql(`select 1 from public.quotes where author = 'Test' limit 1`)).length) return;
+    // Other tests add or replace quotes, so this only applies to a freshly migrated database
+    // (the starter set is inserted in one statement, so it shares one created_at).
+    if ((await sql(`select 1 from public.quotes where created_at <> (select min(created_at) from public.quotes) limit 1`)).length) return;
     const rows = await sql(`select count(*)::int as n, count(*) filter (where author <> '' and is_active)::int as ok from public.quotes`);
     expect(rows[0]).toEqual({ n: 20, ok: 20 });
   });

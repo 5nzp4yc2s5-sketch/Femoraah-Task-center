@@ -55,8 +55,11 @@ export function BarChart({
   grouped?: boolean;
 }) {
   const totals = bars.map((b) => (grouped ? Math.max(0, ...series.map((s) => b.values[s.key] ?? 0)) : series.reduce((n, s) => n + (b.values[s.key] ?? 0), 0)));
-  const max = Math.max(1, ...totals);
-  const ticks = max <= 4 ? Array.from({ length: max + 1 }, (_, i) => i) : [0, Math.round(max / 2), max];
+  // Whole-number gridlines at a round step (1, 2, 5, 10, 20, 50…), at most about four of them.
+  const peak = Math.max(1, ...totals);
+  const step = [1, 2, 5].flatMap((m) => [1, 10, 100, 1000].map((p) => m * p)).sort((a, b) => a - b).find((st) => peak / st <= 4) ?? Math.ceil(peak / 4);
+  const max = Math.ceil(peak / step) * step;
+  const ticks = Array.from({ length: max / step + 1 }, (_, i) => i * step);
 
   return (
     <figure aria-label={label} className="w-full">

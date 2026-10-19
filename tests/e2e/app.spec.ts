@@ -214,7 +214,8 @@ test('Team Calendar: admin records leave with a backup and a holiday; the backup
   await admin.getByLabel('Last day').fill(isoIn(1));
   await admin.getByRole('button', { name: 'Add leave' }).click();
   await expect(admin.getByText(/overlaps another leave/)).toBeVisible();
-  await admin.getByLabel('Date', { exact: true }).fill(isoIn(10));
+  // The reference data already has Diwali on 30-Oct-26, and a second holiday on one date is refused.
+  await admin.getByLabel('Date', { exact: true }).fill(isoIn(10) === '2026-10-30' ? isoIn(11) : isoIn(10));
   await admin.getByLabel('Holiday', { exact: true }).fill('Founders Day');
   await admin.getByRole('button', { name: 'Add holiday' }).click();
   await expect(admin.getByText('Founders Day').first()).toBeVisible();
@@ -866,7 +867,7 @@ test('Phase 5: attendance at a glance on the dashboards, with filters, trends an
   await expect(trend.getByRole('listitem').filter({ has: admin.locator('a') })).toHaveCount(14);
   const todayBar = trend.getByRole('link', { name: /Today, so far/ });
   await expect(todayBar).toHaveAttribute('href', /\/attendance\?from=\d{4}-\d{2}-\d{2}$/);
-  await expect(todayBar).toHaveAttribute('aria-label', /\d+ on time, \d+ late, \d+ not signed in, \d+ on leave/);
+  await expect(todayBar).toHaveAttribute('aria-label', /\d+ on time, \d+ late, \d+ not signed in, \d+ on leave, \d+ worked a day off/);
   await expect(overview.getByRole('link', { name: 'Warehouse', exact: true })).toHaveAttribute('href', /\/attendance\?team=/);
   await expect(admin.getByRole('figure', { name: /Tasks added and done per day/ })).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/34-dashboard-attendance.png`, fullPage: true });
