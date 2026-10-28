@@ -75,10 +75,12 @@ describe('admin areas', () => {
     expect(decide.error).toBeNull();
     expect((await s.rpc('admin_save_team', { p_id: null, p_name: 'Warehouse' })).error).toBeNull();
 
-    // Still no company settings, sheets admin or Super Admin powers.
+    // Still no company settings, sheets admin or Super Admin powers (adding a sheet is open to everyone).
     const brand = await s.rpc('admin_update_branding', { p_company_name: 'X', p_tagline: '', p_primary: '', p_secondary: '', p_accent: '' });
     expect(brand.error?.code).toBe('42501');
-    expect((await s.rpc('sheet_save', sheetArgs())).error?.code).toBe('42501');
+    const sheet = await s.rpc('sheet_save', sheetArgs());
+    expect(sheet.error).toBeNull();
+    expect((await s.rpc('sheet_set_archived', { p_id: sheet.data, p_archived: true })).error?.code).toBe('42501');
     expect((await s.rpc('admin_set_areas', { p_member: ids.Shruti, p_areas: ['settings'] })).error?.code).toBe('42501');
     expect((await s.rpc('admin_set_pin', { p_member: ids.Dev, p_pin: '999' })).error?.code).toBe('42501');
 
@@ -202,11 +204,41 @@ describe('Google Sheets workspace', () => {
     expect(hide.error?.code).toBe('42501');
     const z = await login('Zinia');
     expect((await z.rpc('sheet_save', sheetArgs({ p_id: id, p_owner: ids.Dev, p_name: 'Mine now' }))).error?.code).toBe('42501');
-    expect((await z.rpc('sheet_save', sheetArgs({ p_url: SHEET2 }))).error?.message).toMatch(/Only a Sheets admin can add/);
     expect((await d.rpc('sheet_set_archived', { p_id: id, p_archived: true })).error?.code).toBe('42501');
 
     const audit = await sql<{ action: string }>(`select action from public.audit_events where entity = 'work_sheet' and entity_id = $1 order by created_at`, [id]);
     expect(audit.map((a) => a.action)).toEqual(['created', 'updated']);
+  });
+
+  it('lets anyone add a sheet, makes them responsible for it, and keeps the admin-only parts for admins', async () => {
+    const z = await login('Zinia');
+    // Naming someone else as responsible is ignored: whoever adds the sheet is responsible for it.
+    const { data: id, error } = await z.rpc('sheet_save', sheetArgs({ p_owner: ids.Dev, p_visibility: 'assigned', p_people: [ids.Sanket] }));
+    expect(error).toBeNull();
+    const row = (await sql<{ owner_id: string; created_by: string; visibility: string }>(
+      'select owner_id, created_by, visibility from public.work_sheets where id = $1', [id]))[0];
+    expect(row).toEqual({ owner_id: ids.Zinia, created_by: ids.Zinia, visibility: 'assigned' });
+
+    const names = async (n: string) => ((await (await login(n)).from('work_sheets').select('name')).data ?? []).map((r) => r.name);
+    expect(await names('Zinia')).toEqual(['Daily orders']);
+    expect(await names('Sanket')).toEqual(['Daily orders']); // working on it
+    expect(await names('Kartik')).toEqual(['Daily orders']); // Sheets admin
+    expect(await names('Dev')).toEqual([]); // not on it, and the sheet is not for everyone
+
+    // She keeps it up to date, but cannot hand it over, change who sees it, or remove it.
+    expect((await z.rpc('sheet_save', sheetArgs({ p_id: id, p_owner: ids.Zinia, p_visibility: 'assigned', p_name: 'Daily orders (Zinia)' }))).error).toBeNull();
+    expect((await z.rpc('sheet_save', sheetArgs({ p_id: id, p_owner: ids.Dev, p_visibility: 'assigned' }))).error?.code).toBe('42501');
+    expect((await z.rpc('sheet_save', sheetArgs({ p_id: id, p_owner: ids.Zinia, p_visibility: 'everyone' }))).error?.code).toBe('42501');
+    expect((await z.rpc('sheet_set_archived', { p_id: id, p_archived: true })).error?.code).toBe('42501');
+    // Another employee cannot add the same spreadsheet again.
+    expect((await (await login('Dev')).rpc('sheet_save', sheetArgs({ p_url: SHEET.replace('#gid=0', '') }))).error?.message).toMatch(/already in the workspace/);
+    // The Super Admin can still hand it over and remove it.
+    const k = await login('Kartik');
+    expect((await k.rpc('sheet_save', sheetArgs({ p_id: id, p_owner: ids.Dev, p_visibility: 'assigned' }))).error).toBeNull();
+    expect((await k.rpc('sheet_set_archived', { p_id: id, p_archived: true })).error).toBeNull();
+
+    const audit = await sql<{ action: string }>(`select action from public.audit_events where entity = 'work_sheet' and entity_id = $1 order by created_at, id`, [id]);
+    expect(audit.map((a) => a.action)).toEqual(['created', 'updated', 'updated', 'archived']);
   });
 
   it('archives instead of deleting, hides archived sheets from employees, and can restore them', async () => {

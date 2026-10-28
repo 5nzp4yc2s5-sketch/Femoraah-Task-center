@@ -73,7 +73,7 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
       <PageHeader
         title="Google Sheets"
         subtitle="Every working sheet in one place: what it is for, who is responsible and who works on it. Google still controls who can open each sheet."
-        actions={canAdmin && !showRemoved ? <Link href="/sheets/new" className="btn-primary whitespace-nowrap">Add a sheet</Link> : undefined}
+        actions={!showRemoved ? <Link href="/sheets/new" className="btn-primary whitespace-nowrap">Add a sheet</Link> : undefined}
       />
       {canAdmin && (
         <div className="mb-3 flex flex-wrap gap-1">
@@ -139,8 +139,8 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
         ) : (
           <EmptyState
             title="No sheets yet"
-            body={canAdmin ? 'Add the Google Sheets your team works in, with who is responsible for each one.' : 'Sheets added by your admin and shared with you will appear here.'}
-            action={canAdmin ? <Link href="/sheets/new" className="btn-primary">Add a sheet</Link> : undefined}
+            body={canAdmin ? 'Add the Google Sheets your team works in, with who is responsible for each one.' : 'Add a Google Sheet you work in, or wait for sheets shared with you to appear here.'}
+            action={<Link href="/sheets/new" className="btn-primary">Add a sheet</Link>}
           />
         )
       ) : (

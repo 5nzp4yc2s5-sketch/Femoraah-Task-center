@@ -10,6 +10,7 @@ interface TeamOption {
 /**
  * Fields for adding or editing a sheet. The responsible person and visibility are only editable by a
  * Sheets admin; for the responsible person themselves they are shown read-only and sent unchanged.
+ * Someone without the Sheets area who adds a sheet becomes its responsible person and picks who can see it.
  */
 export function SheetFields({
   sheet,
@@ -17,6 +18,7 @@ export function SheetFields({
   teams,
   categories,
   canAdmin,
+  myName,
   idPrefix = 'sheet',
 }: {
   sheet?: SheetRow;
@@ -24,11 +26,14 @@ export function SheetFields({
   teams: TeamOption[];
   categories: string[];
   canAdmin: boolean;
+  /** Shown as the responsible person when someone without the Sheets area adds a sheet. */
+  myName?: string;
   idPrefix?: string;
 }) {
   const id = (f: string) => `${idPrefix}-${f}`;
   const people = new Set(sheet?.people ?? []);
   const ownerName = members.find((m) => m.id === sheet?.owner_id)?.name;
+  const choosesVisibility = canAdmin || !sheet;
   return (
     <div className="space-y-4">
       {sheet && <input type="hidden" name="id" value={sheet.id} />}
@@ -73,10 +78,15 @@ export function SheetFields({
               <option value="">Nobody yet</option>
               {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
+          ) : sheet ? (
+            <>
+              <input type="hidden" name="owner" value={sheet.owner_id ?? ''} />
+              <input id={id('owner')} className="input bg-slate-50 text-slate-700" readOnly value={ownerName ?? 'Nobody yet'} />
+            </>
           ) : (
             <>
-              <input type="hidden" name="owner" value={sheet?.owner_id ?? ''} />
-              <input id={id('owner')} className="input bg-slate-50 text-slate-700" readOnly value={ownerName ?? 'Nobody yet'} />
+              <input id={id('owner')} className="input bg-slate-50 text-slate-700" readOnly value={`You (${myName ?? 'you'})`} />
+              <p className="mt-1 text-xs text-slate-500">A Sheets admin can hand it to someone else later.</p>
             </>
           )}
         </div>
@@ -102,7 +112,7 @@ export function SheetFields({
       </fieldset>
       <fieldset>
         <legend className="label">Who can see this entry</legend>
-        {canAdmin ? (
+        {choosesVisibility ? (
           <div className="space-y-1.5">
             <label className="flex items-start gap-2 text-sm">
               <input type="radio" name="visibility" value="everyone" defaultChecked={(sheet?.visibility ?? 'everyone') === 'everyone'} className="mt-0.5" />

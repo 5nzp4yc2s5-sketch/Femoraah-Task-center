@@ -43,7 +43,7 @@ export default async function Help() {
           <li><strong>Super Admin</strong>: everything, including team members, logins, PINs and who is an Admin.</li>
           <li><strong>Admin</strong>: sees all tasks and routines, approves the backlog and records leave for others, plus only the admin areas the Super Admin gives them on the Team page (Attendance, Company settings, Google Sheets, Credentials).</li>
           <li><strong>Access manager</strong>: for a login they were made access manager of, can also change its saved password and share it with others.</li>
-          <li><strong>Employee</strong>: their own work, attendance, and the sheets and logins shared with them.</li>
+          <li><strong>Employee</strong>: their own work, attendance, the sheets and logins shared with them, and the sheets they add.</li>
           <li>Wherever the app says <em>manager</em>, it means an Admin or the Super Admin.</li>
         </ul>
       </Card>
@@ -131,7 +131,7 @@ export default async function Help() {
       </Card>
 
       <Card title="Google Sheets">
-        <p>The <Link href="/sheets" className="text-navy-700 underline">Google Sheets</Link> page lists the team&apos;s sheets with search, filters by team, category and person, and sorting. Select <strong>Open sheet</strong> to open it in Google Sheets. A Sheets admin adds, edits and removes entries; the responsible person can update an entry&apos;s details and who works on it. Removed entries are kept and can be restored. Only the link is stored here, never the sheet&apos;s contents.</p>
+        <p>The <Link href="/sheets" className="text-navy-700 underline">Google Sheets</Link> page lists the team&apos;s sheets with search, filters by team, category and person, and sorting. Select <strong>Open sheet</strong> to open it in Google Sheets. Anyone can add a sheet with <strong>Add a sheet</strong>; whoever adds it becomes its responsible person. A Sheets admin can edit, hand over or remove any entry; the responsible person can update an entry&apos;s details and who works on it. Removed entries are kept and can be restored. Only the link is stored here, never the sheet&apos;s contents.</p>
       </Card>
 
       <Card title="Credentials">

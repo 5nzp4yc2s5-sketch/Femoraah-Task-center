@@ -583,9 +583,9 @@ test('Phase 4: Admin role with admin areas, and the Google Sheets workspace', as
   await expect(shruti).toHaveURL(/error=admins-only/);
   await shruti.goto('/sheets');
   await expect(shruti.getByText('No sheets yet')).toBeVisible();
-  await expect(shruti.getByText('Add a sheet')).toHaveCount(0);
+  // Anyone can add a sheet, but without the Sheets area she cannot choose who is responsible
   await shruti.goto('/sheets/new');
-  await expect(shruti).toHaveURL(/error=admins-only/);
+  await expect(shruti.getByLabel('Responsible person', { exact: true })).toHaveValue('You (Shruti)');
 
   // The Super Admin gives her the Google Sheets area only
   await admin.getByLabel(/^Google Sheets/).check();
@@ -649,7 +649,6 @@ test('Phase 4: Admin role with admin areas, and the Google Sheets workspace', as
   await zinia.goto('/sheets');
   await expect(zinia.locator('table').getByRole('row', { name: /Daily sales tracker/ })).toBeVisible();
   await expect(zinia.getByText('Payroll inputs')).toHaveCount(0);
-  await expect(zinia.getByText('Add a sheet')).toHaveCount(0);
   await zinia.locator('table').getByRole('link', { name: 'Daily sales tracker' }).click();
   await expect(zinia.getByRole('heading', { name: 'Daily sales tracker' })).toBeVisible();
   await expect(zinia.getByLabel('Responsible person', { exact: true })).toHaveValue('Zinia');
@@ -685,6 +684,23 @@ test('Phase 4: Admin role with admin areas, and the Google Sheets workspace', as
   await expect(admin.getByText(/Restored by Kartik/)).toBeVisible();
   await expect(admin.getByText(/Removed from the workspace by Kartik/)).toBeVisible();
   await expect(admin.getByText(/Added by Kartik/)).toBeVisible();
+
+  // An Employee adds a sheet too: she becomes responsible for it and chooses who can see it
+  await zinia.goto('/sheets');
+  await zinia.getByRole('link', { name: 'Add a sheet' }).first().click();
+  await expect(zinia).toHaveURL(/\/sheets\/new$/);
+  await expect(zinia.getByLabel('Responsible person', { exact: true })).toHaveValue('You (Zinia)');
+  await expect(zinia.getByLabel('Responsible person', { exact: true })).not.toBeEditable();
+  await zinia.getByLabel('Sheet name').fill('Returns log');
+  await zinia.getByLabel('Google Sheets link').fill('https://docs.google.com/spreadsheets/d/1ReturnsLogReturnsLogReturnsLog12345/edit');
+  await zinia.getByLabel(/^Only the responsible person/).check();
+  await zinia.getByRole('button', { name: 'Add sheet' }).click();
+  await expect(zinia.getByText('Added Returns log.')).toBeVisible();
+  await zinia.screenshot({ path: `${SHOTS}/37-employee-adds-sheet.png`, fullPage: true });
+  await dev.goto('/sheets');
+  await expect(dev.getByText('Returns log')).toHaveCount(0);
+  await admin.goto('/sheets');
+  await expect(admin.locator('table').getByRole('row', { name: /Returns log/ })).toContainText('Zinia');
 });
 
 test('Phase 4b: shared logins with PIN-checked show and copy, access managers and history', async ({ browser }) => {
