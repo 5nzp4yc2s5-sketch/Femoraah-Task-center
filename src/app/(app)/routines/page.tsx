@@ -57,7 +57,7 @@ export default async function Routines({ searchParams }: { searchParams: Promise
   const figure = (label: string, s: string, n: number, tone: string) => (
     <Link
       href={href(status === s ? '' : s)}
-      className={`rounded px-1 hover:underline ${status === s ? 'bg-navy-100 font-semibold text-navy-900' : ''}`}
+      className={`rounded px-1 hover:underline ${status === s ? 'bg-navy-100 font-semibold text-slate-900' : ''}`}
       aria-current={status === s ? 'true' : undefined}
     >
       {label} <span className={`font-semibold tabular-nums ${n ? tone : 'text-slate-700'}`}>{n}</span>

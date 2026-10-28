@@ -89,10 +89,10 @@ export default async function CredentialPage({ params, searchParams }: { params:
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href={removed ? '/credentials?removed=1' : '/credentials'} className="text-sm text-navy-700 hover:underline">← Credentials</Link>
+      <Link href={removed ? '/credentials?removed=1' : '/credentials'} className="link text-sm">← Credentials</Link>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{c.name}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{c.name}</h1>
           <p className="text-sm text-slate-600">
             {c.category && <>{c.category} · </>}Your access: {LEVEL_LABELS[level]}
           </p>
@@ -120,7 +120,7 @@ export default async function CredentialPage({ params, searchParams }: { params:
           <div className="min-w-0">
             <dt className="label">Username or email</dt>
             <dd className="flex items-center gap-2">
-              <span className="min-w-0 break-all font-mono text-navy-900">{c.username || '—'}</span>
+              <span className="min-w-0 break-all font-mono text-slate-900">{c.username || '—'}</span>
               {c.username && <CopyText value={c.username} label="username" />}
             </dd>
           </div>
@@ -180,7 +180,7 @@ export default async function CredentialPage({ params, searchParams }: { params:
                 {[...people, ...teamGrants].map((g) => (
                   <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
                     <div className="min-w-0">
-                      <div className="font-medium text-navy-900">{g.member_id ? nameOf(g.member_id) : `${teamOf(g.team_id)} team`}</div>
+                      <div className="font-medium text-slate-900">{g.member_id ? nameOf(g.member_id) : `${teamOf(g.team_id)} team`}</div>
                       <div className="text-xs text-slate-500">
                         {g.level === 'manage' ? 'Access manager: can show, copy, change and share' : g.team_id ? 'Everyone in the team can show and copy' : 'Can show and copy'}
                         {nameOf(g.granted_by) && <> · added by {nameOf(g.granted_by)}</>} · {fmtDate(localDay(g.granted_at, me.timezone))}

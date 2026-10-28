@@ -121,7 +121,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 const next = defaults.filter((d) => d.team_id === sc.id && d.effective_from > today).sort((a, b) => a.effective_from.localeCompare(b.effective_from));
                 return (
                   <tr key={sc.id ?? 'company'}>
-                    <td className="whitespace-nowrap font-medium text-navy-900">
+                    <td className="whitespace-nowrap font-medium text-slate-900">
                       {sc.label}
                       {next.map((n) => (
                         <span key={n.id} className="mt-1 block text-xs font-normal text-blue-800">
@@ -146,7 +146,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     )}
                     <td className="text-right tabular-nums">{followers(sc.id)}</td>
                     <td className="whitespace-nowrap">
-                      <Link href={`/settings?team=${sc.id ?? ''}#set-hours`} className="text-sm text-navy-700 hover:underline">Change</Link>
+                      <Link href={`/settings?team=${sc.id ?? ''}#set-hours`} className="link text-sm">Change</Link>
                     </td>
                   </tr>
                 );
@@ -156,7 +156,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
 
         <ActionForm key={formTeam || 'company'} action={setDefaultHoursAction} className="card mt-3 space-y-4 p-4 sm:p-5">
-          <h3 id="set-hours" className="scroll-mt-4 font-semibold text-navy-900">Set default hours</h3>
+          <h3 id="set-hours" className="scroll-mt-4 font-semibold text-slate-900">Set default hours</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
               <label className="label" htmlFor="d-team">Applies to</label>
@@ -292,7 +292,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 const next = memberTeams.filter((m) => m.member_id === p.member_id && m.effective_from > today);
                 return (
                   <tr key={p.member_id}>
-                    <td className="whitespace-nowrap font-medium text-navy-900">{p.member_name}</td>
+                    <td className="whitespace-nowrap font-medium text-slate-900">{p.member_name}</td>
                     <td className="whitespace-nowrap">{p.team_name ?? <span className="text-slate-500">No team</span>}</td>
                     <td className="whitespace-nowrap">{p.source === 'Personal' ? 'Own schedule' : p.source === 'Team' ? 'Team default' : p.source === 'Company' ? 'Company default' : '—'}</td>
                     <td className="whitespace-nowrap tabular-nums">

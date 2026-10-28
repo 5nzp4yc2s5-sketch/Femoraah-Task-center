@@ -27,7 +27,7 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
   if (error) {
     return (
       <div className="max-w-3xl space-y-6">
-        <Link href="/team" className="text-sm text-navy-700 hover:underline">← Team</Link>
+        <Link href="/team" className="link text-sm">← Team</Link>
         <Notice tone="error">Could not load this member: {friendlyError(error.message)}</Notice>
       </div>
     );
@@ -39,13 +39,13 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href="/team" className="text-sm text-navy-700 hover:underline">← Team</Link>
+      <Link href="/team" className="link text-sm">← Team</Link>
       {sp.created && <Notice>Member added.</Notice>}
       {sp.loginError && <Notice tone="error">Member added, but the login could not be created: {sp.loginError}</Notice>}
       <div className="flex items-start gap-3">
         <Avatar name={m.name} />
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{m.name}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{m.name}</h1>
           <p className="text-sm text-slate-600">
             {m.role_title && <>{m.role_title} · </>}
             {m.open_tasks}/{m.max_open_tasks} open · {m.overdue} overdue · {m.blocked} blocked ·{' '}
@@ -88,7 +88,7 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
                 <label key={a.key} className="flex items-start gap-2 text-sm">
                   <input type="checkbox" name="area" value={a.key} defaultChecked={granted.has(a.key)} className="mt-0.5" />
                   <span>
-                    <span className="font-medium text-navy-900">{a.label}</span>
+                    <span className="font-medium text-slate-900">{a.label}</span>
                     <span className="block text-xs text-slate-500">{a.help}</span>
                   </span>
                 </label>

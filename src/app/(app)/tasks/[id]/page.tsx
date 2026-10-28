@@ -56,11 +56,11 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
     <div className="max-w-5xl">
       {sp.created && <Notice>Task created and assigned to {task.owner_name}.</Notice>}
       {task.archived_at && <Notice tone="warn">This task is archived. It no longer counts toward workload or dashboards.</Notice>}
-      <Link href="/tasks" className="text-sm text-navy-700 hover:underline">← Task Board</Link>
+      <Link href="/tasks" className="link text-sm">← Task Board</Link>
       <div className="mb-5 mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="font-mono text-xs text-slate-500">{task.task_code}</div>
-          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{task.title}</h1>
+          <div className="text-xs tabular-nums text-slate-500">{task.task_code}</div>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{task.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <FlagBadge flag={task.flag} />
             {canProgress && !task.archived_at ? <StatusSelect id={task.id} status={task.status} blocker={task.blocker_reason} /> : <StatusBadge status={task.status} />}
@@ -85,7 +85,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
       {task.status === 'Blocked' && (
         <div className="mb-5 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3" role="note">
-          <div className="text-xs font-semibold uppercase tracking-wide text-orange-800">
+          <div className="text-[13px] font-semibold text-orange-800">
             Blocked{task.blocked_at && <> since <LocalTime iso={task.blocked_at} /></>}
           </div>
           <p className="mt-1 whitespace-pre-wrap font-medium text-orange-900">{task.blocker_reason || 'No reason recorded'}</p>
@@ -105,7 +105,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
             ].map(([k, v]) => (
               <div key={k}>
                 <dt className="label">{k}</dt>
-                <dd className="text-navy-900">{v}</dd>
+                <dd className="text-slate-900">{v}</dd>
               </div>
             ))}
             <div>
@@ -138,7 +138,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
           {canProgress && !task.archived_at && (
             <section className="card p-5">
-              <h2 className="mb-3 font-semibold text-navy-900">Update progress</h2>
+              <h2 className="mb-3 font-semibold text-slate-900">Update progress</h2>
               <ActionForm action={updateProgressAction} className="space-y-4">
                 <input type="hidden" name="id" value={task.id} />
                 <ProgressFields task={task} />
@@ -149,7 +149,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
           {canEdit && !task.archived_at && (
             <details className="card p-5">
-              <summary className="cursor-pointer font-semibold text-navy-900">Edit task, reassign or change who delegated it</summary>
+              <summary className="cursor-pointer font-semibold text-slate-900">Edit task, reassign or change who delegated it</summary>
               <ActionForm action={updateTaskAction} className="mt-4 space-y-4">
                 <input type="hidden" name="id" value={task.id} />
                 <CoreFields task={task} members={members} />
@@ -162,7 +162,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
 
         <aside className="space-y-5">
           <section className="card p-5">
-            <h2 className="mb-2 font-semibold text-navy-900">Collaborators</h2>
+            <h2 className="mb-2 font-semibold text-slate-900">Collaborators</h2>
             {collabIds.length === 0 && <p className="text-sm text-slate-500">None. Collaborators can see and update progress.</p>}
             <ul className="space-y-1.5">
               {collabIds.map((cid) => (

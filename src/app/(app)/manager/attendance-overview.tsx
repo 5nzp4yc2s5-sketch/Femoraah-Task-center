@@ -158,8 +158,8 @@ export async function AttendanceOverview() {
     <section aria-labelledby="att-today" className="fade-up">
       {refresh.error && <Notice tone="warn">Attendance could not be brought fully up to date ({friendlyError(refresh.error.message)}). Figures may miss the latest exceptions.</Notice>}
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="att-today" className="text-sm font-semibold uppercase tracking-wide text-navy-800">Attendance today</h2>
-        <Link href="/attendance" className="text-sm text-navy-700 hover:underline">Attendance →</Link>
+        <h2 id="att-today" className="text-[15px] font-semibold text-slate-900">Attendance today</h2>
+        <Link href="/attendance" className="link text-sm">Open attendance</Link>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard
@@ -203,8 +203,8 @@ export async function AttendanceOverview() {
           <SectionTitle action={<span className="text-xs text-slate-500">Select a day to open it</span>}>Last 14 days</SectionTitle>
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-              <span className="text-slate-600">On time <strong className="tabular-nums text-navy-900">{onTimeRate}</strong></span>
-              <span className="text-slate-600">Average day <strong className="tabular-nums text-navy-900">{avgHours}</strong></span>
+              <span className="text-slate-600">On time <strong className="tabular-nums text-slate-900">{onTimeRate}</strong></span>
+              <span className="text-slate-600">Average day <strong className="tabular-nums text-slate-900">{avgHours}</strong></span>
             </div>
             <BarChart bars={bars} series={TREND} label="Sign-ins per day over the last 14 days: on time, late, not signed in, on leave and worked a day off" />
             <Legend series={TREND} />
@@ -219,7 +219,7 @@ export async function AttendanceOverview() {
               {teamLines.map((t) => (
                 <li key={t.id ?? 'none'} className="p-3">
                   <div className="flex items-baseline justify-between gap-2">
-                    <Link href={t.id ? `/attendance?team=${t.id}` : '/attendance'} className="font-medium text-navy-900 hover:underline">{t.name}</Link>
+                    <Link href={t.id ? `/attendance?team=${t.id}` : '/attendance'} className="font-medium text-slate-900 hover:underline">{t.name}</Link>
                     <span className="text-xs tabular-nums text-slate-600">
                       {t.expected ? `${t.present}/${t.expected} in` : t.present ? `${t.present} in, none scheduled` : 'Day off today'}
                       {t.late ? ` · ${t.late} late` : ''}

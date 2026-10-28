@@ -226,7 +226,7 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
         </div>
       )}
 
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-navy-800">Tasks and routines</h2>
+      <h2 className="mb-2 text-[15px] font-semibold text-slate-900">Tasks and routines</h2>
       <form className="card mb-4 grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-7" role="search" aria-label="Dashboard filters">
         <div>
           <label className="label" htmlFor="f-member">Employee</label>
@@ -320,7 +320,7 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
         </div>
       )}
 
-      <SectionTitle action={<Link href="/team" className="text-sm text-navy-700 hover:underline">Team →</Link>}>Per employee</SectionTitle>
+      <SectionTitle action={<Link href="/team" className="link text-sm">Open team</Link>}>Per employee</SectionTitle>
       {people.length === 0 ? (
         <EmptyState title="No active team members match" action={hasFilters ? <Link href="/manager" className="btn-secondary">Clear filters</Link> : undefined} />
       ) : (
@@ -419,7 +419,7 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
                 <li key={t.id}>
                   <Link href={`/tasks/${t.id}`} className={`card block border-l-4 p-3 ${t.days_left !== null && t.days_left < 0 ? 'border-l-red-500' : 'border-l-orange-500'}`}>
                     <div className="text-xs text-slate-500">{t.task_code} · Assigned to {t.owner_name ?? '—'}</div>
-                    <div className="font-medium text-navy-900">
+                    <div className="font-medium text-slate-900">
                       {t.title} <FlaggedStar on={t.is_flagged} />
                     </div>
                     <div className="mt-1.5 text-xs">{why(t)}</div>
@@ -447,11 +447,11 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
                 </thead>
                 <tbody>
                   {escalations.map((t) => (
-                    <tr key={t.id} className={t.days_left !== null && t.days_left < 0 ? 'bg-red-50/70' : 'bg-orange-50/80'}>
-                      <td className="whitespace-nowrap font-mono text-xs text-slate-500">
+                    <tr key={t.id} className={t.days_left !== null && t.days_left < 0 ? 'edge-red' : 'edge-orange'}>
+                      <td className="whitespace-nowrap text-xs text-slate-500">
                         <Link href={`/tasks/${t.id}`} className="hover:underline">{t.task_code}</Link>
                       </td>
-                      <td className="min-w-48 font-medium text-navy-900">
+                      <td className="min-w-48 font-medium text-slate-900">
                         <Link href={`/tasks/${t.id}`} className="hover:underline">{t.title}</Link> <FlaggedStar on={t.is_flagged} />
                       </td>
                       <td className="whitespace-nowrap">{t.owner_name ?? '—'}</td>
@@ -480,7 +480,7 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
                 <li key={r.id}>
                   <Link href={`/routines/${r.id}`} className="card block border-l-4 border-l-red-500 p-3">
                     <div className="text-xs text-slate-500">{r.routine_code} · Assigned to {r.owner_name ?? '—'}</div>
-                    <div className="font-medium text-navy-900">{r.title}</div>
+                    <div className="font-medium text-slate-900">{r.title}</div>
                     <div className="mt-1 text-xs text-slate-600">
                       {r.frequency} · Next due {fmtDate(r.next_due)}
                       {r.next_due && <span className="font-semibold text-red-700"> · {plural(daysBetween(r.next_due, d.today), 'day')} overdue</span>}
@@ -505,11 +505,11 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
                 </thead>
                 <tbody>
                   {overdueRoutines.map((r) => (
-                    <tr key={r.id} className="bg-red-50/70">
-                      <td className="whitespace-nowrap font-mono text-xs text-slate-500">
+                    <tr key={r.id} className="edge-red">
+                      <td className="whitespace-nowrap text-xs text-slate-500">
                         <Link href={`/routines/${r.id}`} className="hover:underline">{r.routine_code}</Link>
                       </td>
-                      <td className="min-w-56 font-medium text-navy-900">
+                      <td className="min-w-56 font-medium text-slate-900">
                         <Link href={`/routines/${r.id}`} className="hover:underline">{r.title}</Link>
                       </td>
                       <td className="whitespace-nowrap">{r.owner_name ?? '—'}</td>
@@ -528,7 +528,7 @@ export default async function ManagerDashboard({ searchParams }: { searchParams:
 
       {member && selectedName && (
         <section id="person" className="mt-2">
-          <SectionTitle action={<Link href={qs('/manager', { status, priority, from, to, frequency })} className="text-sm text-navy-700 hover:underline" scroll={false}>Close</Link>}>
+          <SectionTitle action={<Link href={qs('/manager', { status, priority, from, to, frequency })} className="link text-sm" scroll={false}>Close</Link>}>
             {selectedName}: open and recent tasks
           </SectionTitle>
           <TaskTable rows={personTasks} empty={{ title: `${selectedName} has no tasks` }} />

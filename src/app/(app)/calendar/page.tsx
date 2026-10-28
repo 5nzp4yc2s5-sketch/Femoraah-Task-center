@@ -122,7 +122,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
           <Link href={`/calendar?month=${prev}`} className="btn-ghost px-2.5" aria-label={`Previous month, ${monthLabel(prev)}`}>
             ← <span className="hidden sm:inline">{monthShort(prev)}</span>
           </Link>
-          <h2 className="min-w-32 text-center text-base font-semibold text-navy-900 sm:min-w-40">{monthLabel(month)}</h2>
+          <h2 className="min-w-32 text-center text-base font-semibold text-slate-900 sm:min-w-40">{monthLabel(month)}</h2>
           <Link href={`/calendar?month=${next}`} className="btn-ghost px-2.5" aria-label={`Next month, ${monthLabel(next)}`}>
             <span className="hidden sm:inline">{monthShort(next)}</span> →
           </Link>
@@ -161,7 +161,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
                     {monthHolidays.map((h) => (
                       <li key={h.id} className="flex items-start justify-between gap-3 px-4 py-3">
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-navy-900">{h.label}</div>
+                          <div className="text-sm font-medium text-slate-900">{h.label}</div>
                           <div className="text-xs text-slate-600">
                             {weekdayShort(h.start_date)}, {fmtDate(h.start_date)}
                             {h.note ? ` · ${h.note}` : ''}
@@ -185,7 +185,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
                             <Avatar name={e.member_name ?? '?'} size="sm" />
-                            <span className="truncate font-medium text-navy-900">{e.member_name}</span>
+                            <span className="truncate font-medium text-slate-900">{e.member_name}</span>
                           </div>
                           <span className={`${PILL} ${LEAVE_TONE}`}>{e.label}</span>
                         </div>
@@ -220,7 +220,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
                               <td className="whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                   <Avatar name={e.member_name ?? '?'} size="sm" />
-                                  <span className="font-medium text-navy-900">{e.member_name}</span>
+                                  <span className="font-medium text-slate-900">{e.member_name}</span>
                                   {today >= e.start_date && today <= e.end_date && <CapacityBadge status="On Leave" />}
                                 </div>
                               </td>
@@ -259,7 +259,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
               {upcoming.map((h) => (
                 <li key={h.id} className="flex items-start justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <Link href={`/calendar?month=${h.holiday_date.slice(0, 7)}`} className="text-sm font-medium text-navy-900 hover:underline">
+                    <Link href={`/calendar?month=${h.holiday_date.slice(0, 7)}`} className="text-sm font-medium text-slate-900 hover:underline">
                       {h.name}
                     </Link>
                     <div className="text-xs text-slate-600">
@@ -278,7 +278,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
 
       <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <section id="add-leave" className="card scroll-mt-4 p-5" aria-labelledby="add-leave-title">
-          <h2 id="add-leave-title" className="font-semibold text-navy-900">Add leave</h2>
+          <h2 id="add-leave-title" className="font-semibold text-slate-900">Add leave</h2>
           <p className="mt-1 text-sm text-slate-600">
             {me.isManager
               ? 'Record leave for anyone, including past dates.'
@@ -294,7 +294,7 @@ export default async function TeamCalendar({ searchParams }: { searchParams: Pro
 
         {me.isManager && (
           <section id="add-holiday" className="card scroll-mt-4 p-5" aria-labelledby="add-holiday-title">
-            <h2 id="add-holiday-title" className="font-semibold text-navy-900">Add holiday</h2>
+            <h2 id="add-holiday-title" className="font-semibold text-slate-900">Add holiday</h2>
             <p className="mt-1 text-sm text-slate-600">
               A company holiday is a day off for everyone, except people who swap it for another day.
               {me.isAdmin ? ' As an admin you can also add holidays in the past.' : ' Only an admin can add or change holidays in the past.'}

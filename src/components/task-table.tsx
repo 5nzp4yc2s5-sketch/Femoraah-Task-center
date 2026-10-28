@@ -53,21 +53,22 @@ export function TaskTable({
       <ul className="space-y-2 md:hidden">
         {rows.map((r) => (
           <li key={r.id}>
-            <Link href={`/tasks/${r.id}`} className={`card block border-l-4 p-3 ${flagBorder(r.flag)}`}>
+            <Link href={`/tasks/${r.id}`} className={`card block border-l-[3px] p-3.5 ${flagBorder(r.flag)} ${r.status === 'Done' ? 'opacity-75' : ''}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-xs text-slate-500">{r.task_code}</div>
-                  <div className="font-medium text-navy-900">{r.title} <FlaggedStar on={r.is_flagged} /></div>
+                  <div className="text-xs tabular-nums text-slate-500">{r.task_code}</div>
+                  <div className="mt-0.5 font-medium text-slate-900">{r.title} <FlaggedStar on={r.is_flagged} /></div>
                 </div>
                 <FlagBadge flag={r.flag} />
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600">
                 <StatusBadge status={r.status} />
                 <PriorityBadge priority={r.priority} />
-                <span>{r.owner_name}</span>
-                {r.assigned_by_name && r.assigned_by !== r.owner_id && <span className="text-slate-500">· from {r.assigned_by_name}</span>}
-                <span>· Due {fmtDate(r.due_date)}</span>
-                <span>· <DaysLeft row={r} /></span>
+                <span>
+                  {r.owner_name}
+                  {r.assigned_by_name && r.assigned_by !== r.owner_id && <span className="text-slate-500">, from {r.assigned_by_name}</span>}
+                </span>
+                <span>Due {fmtDate(r.due_date)} (<DaysLeft row={r} />)</span>
               </div>
               <div className="mt-2">
                 <ProgressBar value={r.percent_complete} />
@@ -104,13 +105,13 @@ export function TaskTable({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className={flagStyles[r.flag]?.row}>
-                <td className="whitespace-nowrap font-mono text-xs text-slate-500">
+                <td className="whitespace-nowrap text-xs text-slate-500">
                   <Link href={`/tasks/${r.id}`} className="hover:underline">{r.task_code}</Link>
                 </td>
-                <td className="min-w-48 font-medium text-navy-900">
+                <td className="min-w-48 font-medium text-slate-900">
                   <Link href={`/tasks/${r.id}`} className="hover:underline">{r.title}</Link> <FlaggedStar on={r.is_flagged} />
                 </td>
-                {!compact && <td className="max-w-64 text-slate-600"><span className="line-clamp-2">{r.details || '—'}</span></td>}
+                {!compact && <td className="max-w-64 text-slate-500"><span className="line-clamp-2">{r.details || '—'}</span></td>}
                 <td className="whitespace-nowrap">{r.owner_name}</td>
                 {!compact && <td className="whitespace-nowrap text-slate-600">{r.assigned_by_name}</td>}
                 <td><PriorityBadge priority={r.priority} /></td>
@@ -145,6 +146,6 @@ function flagBorder(flag: string) {
     case 'Done':
       return 'border-l-green-600';
     default:
-      return 'border-l-line';
+      return 'border-l-line-strong';
   }
 }

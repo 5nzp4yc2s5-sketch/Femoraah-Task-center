@@ -103,10 +103,10 @@ export function WhoIsIn({ people, teams }: { people: Presence[]; teams: { id: st
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate font-medium text-navy-900">{p.name}</div>
+                        <div className="truncate font-medium text-slate-900">{p.name}</div>
                         <div className="truncate text-xs text-slate-500">{p.teamName ?? 'No team'}{p.exempt ? ' · Exempt from timing' : ''}</div>
                       </div>
-                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${s.chip}`}>
+                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.chip}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${s.dot} ${p.state === 'working' ? 'animate-pulse' : ''}`} aria-hidden />
                         {s.label}
                       </span>

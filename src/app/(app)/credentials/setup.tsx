@@ -14,7 +14,7 @@ export function KeySetup({ status, isSuperAdmin }: { status: Exclude<KeyStatus, 
   return (
     <section className="card mb-5 space-y-4 border-amber-200 p-5">
       <div>
-        <h2 className="text-base font-semibold text-navy-900">Switch on the credential manager</h2>
+        <h2 className="text-base font-semibold text-slate-900">Switch on the credential manager</h2>
         <p className="mt-1 text-sm text-slate-600">
           {status === 'invalid'
             ? 'The server has a CREDENTIALS_ENCRYPTION_KEY, but it is not a valid key (it must be 32 random bytes in base64). Replace it using the steps below.'

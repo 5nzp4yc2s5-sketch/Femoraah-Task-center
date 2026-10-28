@@ -35,7 +35,7 @@ export default async function RoutineDetail({ params }: { params: Promise<{ id: 
   if (error) {
     return (
       <div className="max-w-4xl">
-        <Link href="/routines" className="text-sm text-navy-700 hover:underline">← Routine Tasks</Link>
+        <Link href="/routines" className="link text-sm">← Routine Tasks</Link>
         <div className="mt-3"><Notice tone="error">Could not load this routine: {friendlyError(error.message)}</Notice></div>
       </div>
     );
@@ -68,11 +68,11 @@ export default async function RoutineDetail({ params }: { params: Promise<{ id: 
 
   return (
     <div className="max-w-4xl">
-      <Link href="/routines" className="text-sm text-navy-700 hover:underline">← Routine Tasks</Link>
+      <Link href="/routines" className="link text-sm">← Routine Tasks</Link>
       <div className="mb-5 mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="font-mono text-xs text-slate-500">{r.routine_code}</div>
-          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{r.title}</h1>
+          <div className="text-xs tabular-nums text-slate-500">{r.routine_code}</div>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{r.title}</h1>
           <p className="mt-1 text-sm text-slate-600">
             Assigned to {r.owner_name} · {r.backup_name ? `Backup ${r.backup_name}` : 'No backup'} · {r.frequency}, every {r.every_n_days} day{r.every_n_days === 1 ? '' : 's'}
           </p>
@@ -116,7 +116,7 @@ export default async function RoutineDetail({ params }: { params: Promise<{ id: 
               <li key={h.id} className="card p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="font-medium tabular-nums text-navy-900">
+                    <div className="font-medium tabular-nums text-slate-900">
                       {fmtDate(h.completed_on)}
                       {h.completed_on > h.cycle_due ? <span className="ml-1 text-xs text-red-700">late</span> : null}
                     </div>
@@ -163,7 +163,7 @@ export default async function RoutineDetail({ params }: { params: Promise<{ id: 
 
       {me.isManager && (
         <details className="card mt-6 p-5">
-          <summary className="cursor-pointer font-semibold text-navy-900">Edit routine</summary>
+          <summary className="cursor-pointer font-semibold text-slate-900">Edit routine</summary>
           <p className="mt-1 text-sm text-slate-600">Change the title, who it is assigned to, the backup, the frequency or the notes. History is kept.</p>
           <ActionForm action={updateRoutineAction} className="mt-4 space-y-4">
             <input type="hidden" name="id" value={r.id} />

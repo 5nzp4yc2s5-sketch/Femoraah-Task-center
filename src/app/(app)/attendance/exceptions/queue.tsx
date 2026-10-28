@@ -156,7 +156,7 @@ export function ExceptionQueue({ rows }: { rows: ExceptionRow[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-navy-900">
+                      <div className="font-medium text-slate-900">
                         {r.member_name} · {r.flag_type}
                       </div>
                       <div className="text-xs text-slate-500">
@@ -182,7 +182,7 @@ export function ExceptionQueue({ rows }: { rows: ExceptionRow[] }) {
                   </dl>
                   <p className="mt-2 text-sm text-slate-700">{r.reason}</p>
                   <p className="mt-1 text-sm">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Explanation: </span>
+                    <span className="text-[13px] font-medium text-slate-500">Explanation: </span>
                     <span className={r.employee_explanation ? 'text-slate-800' : 'text-slate-500'}>{r.employee_explanation || 'None yet.'}</span>
                   </p>
                   {decided && (

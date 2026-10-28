@@ -192,7 +192,7 @@ function TodayCard({ row, today, scheduleText, graceText }: { row: AttendanceRow
     <section className="card p-4 sm:p-5" aria-labelledby="att-today">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="att-today" className="font-semibold text-navy-900">Today · {fmtDate(today)}</h2>
+          <h2 id="att-today" className="font-semibold text-slate-900">Today · {fmtDate(today)}</h2>
           <p className="mt-0.5 text-sm text-slate-600">{dayLine}</p>
         </div>
         {row?.open_session && <AttendanceBadge status="Currently Working" />}
@@ -200,21 +200,21 @@ function TodayCard({ row, today, scheduleText, graceText }: { row: AttendanceRow
       <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
           <dt className="label">Signed in</dt>
-          <dd className="text-2xl font-semibold tabular-nums text-navy-900">{row ? fmtClock(row.first_login, row.tz) : '—'}</dd>
+          <dd className="text-2xl font-semibold tabular-nums text-slate-900">{row ? fmtClock(row.first_login, row.tz) : '—'}</dd>
           {row && <dd className="mt-1"><LoginStatusCell r={row} /></dd>}
         </div>
         <div>
           <dt className="label">Signed out</dt>
-          <dd className="text-2xl font-semibold tabular-nums text-navy-900">{row ? fmtClock(row.last_logout, row.tz) : '—'}</dd>
+          <dd className="text-2xl font-semibold tabular-nums text-slate-900">{row ? fmtClock(row.last_logout, row.tz) : '—'}</dd>
           {row && <dd className="mt-1"><LogoutStatusCell r={row} /></dd>}
         </div>
         <div>
           <dt className="label">Hours worked</dt>
-          <dd className="text-2xl font-semibold text-navy-900">{row ? <HoursCell r={row} /> : '—'}</dd>
+          <dd className="text-2xl font-semibold text-slate-900">{row ? <HoursCell r={row} /> : '—'}</dd>
         </div>
         <div>
           <dt className="label">My schedule</dt>
-          <dd className="text-sm font-medium text-navy-900">{scheduleText ?? 'Not set'}</dd>
+          <dd className="text-sm font-medium text-slate-900">{scheduleText ?? 'Not set'}</dd>
           {graceText && <dd className="text-xs text-slate-500">{graceText}</dd>}
         </div>
       </dl>

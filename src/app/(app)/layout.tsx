@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         signOut={signOutAction}
         brand={sidebarBrand(brand)}
       />
-      <main className="lg:pl-64">
+      <main className="lg:pl-60">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>
       <AutoRefresh />

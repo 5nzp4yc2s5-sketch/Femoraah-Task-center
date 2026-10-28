@@ -7,7 +7,7 @@ export const metadata = { title: 'How It Works' };
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="card p-5">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy-800">{title}</h2>
+      <h2 className="mb-3 text-[15px] font-semibold text-slate-900">{title}</h2>
       <div className="space-y-2 text-sm leading-relaxed text-slate-700">{children}</div>
     </section>
   );

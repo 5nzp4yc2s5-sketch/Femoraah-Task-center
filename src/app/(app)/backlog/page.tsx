@@ -142,8 +142,8 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
                   <Link href={`/backlog/${b.id}`} className="card block p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-mono text-xs text-slate-500">{b.backlog_code}</div>
-                        <div className="font-medium text-navy-900">{b.title}</div>
+                        <div className="text-xs tabular-nums text-slate-500">{b.backlog_code}</div>
+                        <div className="font-medium text-slate-900">{b.title}</div>
                       </div>
                       <BacklogStatusBadge status={b.status} />
                     </div>
@@ -186,9 +186,9 @@ export default async function Backlog({ searchParams }: { searchParams: Promise<
               </thead>
               <tbody>
                 {rows.map((b) => (
-                  <tr key={b.id} className={b.status === 'Converted to Task' ? 'bg-done/40' : b.status === 'Dismissed' ? 'text-slate-500' : ''}>
-                    <td className="whitespace-nowrap font-mono text-xs"><Link href={`/backlog/${b.id}`} className="hover:underline">{b.backlog_code}</Link></td>
-                    <td className="min-w-48 font-medium text-navy-900"><Link href={`/backlog/${b.id}`} className="hover:underline">{b.title}</Link></td>
+                  <tr key={b.id} className={b.status === 'Converted to Task' ? 'edge-green row-done' : b.status === 'Dismissed' ? 'row-done' : ''}>
+                    <td className="whitespace-nowrap text-xs text-slate-500"><Link href={`/backlog/${b.id}`} className="hover:underline">{b.backlog_code}</Link></td>
+                    <td className="min-w-48 font-medium text-slate-900"><Link href={`/backlog/${b.id}`} className="hover:underline">{b.title}</Link></td>
                     <td className="max-w-56 text-slate-600"><span className="line-clamp-2">{b.details || '—'}</span></td>
                     <td className="max-w-48 text-slate-700">{b.skills_needed}</td>
                     <td><PriorityBadge priority={b.priority} /></td>

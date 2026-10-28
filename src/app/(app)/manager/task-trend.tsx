@@ -51,8 +51,8 @@ export async function TaskTrend({ today, timezone, member }: { today: string; ti
   return (
     <div className="card space-y-3 p-4">
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-        <span>Added <strong className="tabular-nums text-navy-900">{totalAdded}</strong></span>
-        <span>Done <strong className="tabular-nums text-navy-900">{totalDone}</strong></span>
+        <span>Added <strong className="tabular-nums text-slate-900">{totalAdded}</strong></span>
+        <span>Done <strong className="tabular-nums text-slate-900">{totalDone}</strong></span>
         <span>
           {diff > 0 ? (
             <>Open work grew by <strong className="tabular-nums text-amber-800">{diff}</strong></>

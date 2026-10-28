@@ -81,7 +81,7 @@ export default async function ExemptionsPage() {
           <li key={e.id} className="card p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="font-medium text-navy-900">{names.get(e.member_id) ?? 'Former member'}</div>
+                <div className="font-medium text-slate-900">{names.get(e.member_id) ?? 'Former member'}</div>
                 <div className="text-xs text-slate-500">
                   {fmtDate(e.start_date)} {last ? `to ${fmtDate(last)}` : 'onwards (permanent)'}
                 </div>

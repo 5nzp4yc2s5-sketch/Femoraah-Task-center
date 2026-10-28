@@ -49,10 +49,10 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href={removed ? '/sheets?removed=1' : '/sheets'} className="text-sm text-navy-700 hover:underline">← Google Sheets</Link>
+      <Link href={removed ? '/sheets?removed=1' : '/sheets'} className="link text-sm">← Google Sheets</Link>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{s.name}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{s.name}</h1>
           <p className="text-sm text-slate-600">
             {s.category && <>{s.category} · </>}
             {team ?? 'No team'} · Responsible: {nameOf(s.owner_id) ?? 'nobody yet'}

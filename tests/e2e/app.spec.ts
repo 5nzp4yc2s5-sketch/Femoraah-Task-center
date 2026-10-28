@@ -483,7 +483,7 @@ test('Phase 3: company branding, logo, daily quotes and weekly-off swaps', async
   await admin.getByLabel('Company name').fill('Femoraah');
   await admin.getByLabel('Tagline (optional)').fill('Ops command center');
   await admin.getByLabel('Primary colour', { exact: true }).fill('#fde68a');
-  await expect(admin.getByText(/White text on buttons, headers and links: 1\.\d:1/)).toBeVisible();
+  await expect(admin.getByText(/White text on buttons, and links on white: 1\.\d:1/)).toBeVisible();
   await admin.getByRole('button', { name: 'Save company settings' }).click();
   await expect(admin.getByText(/^Hard to read: white text on buttons/)).toBeVisible();
   await admin.getByLabel('Primary colour', { exact: true }).fill('#7c2d12');

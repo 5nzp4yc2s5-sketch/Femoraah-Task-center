@@ -67,7 +67,7 @@ export default async function Team({ searchParams }: { searchParams: Promise<{ s
       m.name
     );
   const roleTag = (m: TeamRow) =>
-    m.access_role !== 'member' && <span className="ml-2 rounded bg-navy-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-navy-800">{ROLE_LABELS[m.access_role]}</span>;
+    m.access_role !== 'member' && <span className="ml-2 rounded-full bg-navy-50 px-2 py-0.5 text-xs font-medium text-navy-800">{ROLE_LABELS[m.access_role]}</span>;
   const status = (m: TeamRow) =>
     !m.is_active ? (
       <span className="text-slate-500">Deactivated</span>
@@ -121,7 +121,7 @@ export default async function Team({ searchParams }: { searchParams: Promise<{ s
                   <div className="flex min-w-0 items-center gap-2.5">
                     <Avatar name={m.name} />
                     <div className="min-w-0">
-                      <div className="font-medium text-navy-900">{name(m)}{roleTag(m)}</div>
+                      <div className="font-medium text-slate-900">{name(m)}{roleTag(m)}</div>
                       <div className="text-xs text-slate-500">{m.role_title || '—'}</div>
                     </div>
                   </div>

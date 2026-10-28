@@ -27,7 +27,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
   if (error) {
     return (
       <div className="max-w-5xl">
-        <Link href="/backlog" className="text-sm text-navy-700 hover:underline">← Pending Backlog</Link>
+        <Link href="/backlog" className="link text-sm">← Pending Backlog</Link>
         <div className="mt-3"><Notice tone="error">Could not load this backlog item: {friendlyError(error.message)}</Notice></div>
       </div>
     );
@@ -50,10 +50,10 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
     <div className="max-w-5xl">
       {sp.created && <Notice>Added to the backlog. {b.suggested_owner_name ? `Suggested owner: ${b.suggested_owner_name}.` : ''} A manager will review it.</Notice>}
       {sp.approved && approved && <Notice>Approved and assigned to {b.final_owner_name}. Use &quot;Convert to task&quot; when the work should start.</Notice>}
-      <Link href="/backlog" className="text-sm text-navy-700 hover:underline">← Pending Backlog</Link>
+      <Link href="/backlog" className="link text-sm">← Pending Backlog</Link>
       <div className="mb-5 mt-2">
-        <div className="font-mono text-xs text-slate-500">{b.backlog_code}</div>
-        <h1 className="text-xl font-semibold text-navy-900 sm:text-2xl">{b.title}</h1>
+        <div className="text-xs tabular-nums text-slate-500">{b.backlog_code}</div>
+        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{b.title}</h1>
         <div className="mt-2 flex flex-wrap gap-2">
           <BacklogStatusBadge status={b.status} />
           <PriorityBadge priority={b.priority} />
@@ -73,7 +73,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
           <section className="card p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h2 className="font-semibold text-navy-900">Suggested assignee: {b.suggested_owner_name ?? 'none'}</h2>
+                <h2 className="font-semibold text-slate-900">Suggested assignee: {b.suggested_owner_name ?? 'none'}</h2>
                 {suggested && (
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                     <span>Now:</span>
@@ -82,7 +82,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
                     <span className="tabular-nums">{suggested.open_tasks}/{suggested.max_open_tasks} open</span>
                   </div>
                 )}
-                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">Suggested by rules: skills, workload, overdue, blocked, availability</p>
+                <p className="mt-2 text-[13px] text-slate-500">Suggested by rules: skills, workload, overdue, blocked, availability</p>
                 <p className="mt-1 text-sm text-slate-700">{b.suggestion_reason ?? 'No suggestion yet.'}</p>
                 {b.suggested_at && <p className="mt-1 text-xs text-slate-500">Calculated <LocalTime iso={b.suggested_at} /></p>}
               </div>
@@ -156,7 +156,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
 
           {canEdit && (
             <details className="card p-5">
-              <summary className="cursor-pointer font-semibold text-navy-900">Edit backlog item</summary>
+              <summary className="cursor-pointer font-semibold text-slate-900">Edit backlog item</summary>
               <ActionForm action={updateBacklogAction} className="mt-4 space-y-4">
                 <input type="hidden" name="id" value={b.id} />
                 <BacklogFields item={b} />
@@ -169,7 +169,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
         <aside className="space-y-5">
           {pending && me.isManager && (
             <section className="card border-navy-600/40 p-5">
-              <h2 className="font-semibold text-navy-900">Manager decision</h2>
+              <h2 className="font-semibold text-slate-900">Manager decision</h2>
               <p className="mb-3 mt-1 text-sm text-slate-600">&quot;Approve and create task&quot; puts it on the Task Board as To Do. &quot;Approve only&quot; records who will take it; create the task later.</p>
               <ApproveForm
                 itemId={b.id}
@@ -188,7 +188,7 @@ export default async function BacklogDetail({ params, searchParams }: { params: 
 
           {approved && (
             <section className={`card p-5 text-sm ${me.isManager ? 'border-navy-600/40' : ''}`}>
-              <h2 className="font-semibold text-navy-900">Approved, not yet a task</h2>
+              <h2 className="font-semibold text-slate-900">Approved, not yet a task</h2>
               <p className="mt-2">
                 Assigned to <strong>{b.final_owner_name}</strong>
                 {b.overrode_suggestion ? ` (overrode suggestion: ${b.suggested_owner_name ?? 'none'})` : ' (as suggested)'}.

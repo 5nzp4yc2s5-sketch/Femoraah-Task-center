@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { brandCss, getBrand } from '@/lib/brand';
 import { DEFAULT_BRAND } from '@/lib/colors';
+import '@fontsource-variable/hanken-grotesk';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
