@@ -10,13 +10,13 @@ import { decideCorrectionAction, explainFlagAction } from './actions';
 import { flagAmount, flagState, type CorrectionRow, type FlagRow } from './lib';
 import type { AttendanceSettings, Recorded } from './data';
 
-const pill = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
+const pill = 'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium';
 
 /** What is (and is not) recorded, shown on every Attendance screen. */
 export function PrivacyNote({ settings }: { settings: AttendanceSettings | null }) {
   return (
     <section className="card mt-6 p-4 text-sm text-slate-700" aria-labelledby="att-privacy">
-      <h2 id="att-privacy" className="font-semibold text-navy-900">How attendance is recorded</h2>
+      <h2 id="att-privacy" className="font-semibold text-slate-900">How attendance is recorded</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>
           Only these are recorded: the time you sign in with your PIN, the time you sign out, and the start and end of any break you take with the
@@ -166,10 +166,10 @@ export function AttendanceTable({
               {showEmployee ? (
                 <div className="flex min-w-0 items-center gap-2">
                   <Avatar name={r.member_name} size="sm" />
-                  <span className="truncate font-medium text-navy-900">{r.member_name}</span>
+                  <span className="truncate font-medium text-slate-900">{r.member_name}</span>
                 </div>
               ) : (
-                <span className="font-medium text-navy-900">{fmtDate(r.work_date)}</span>
+                <span className="font-medium text-slate-900">{fmtDate(r.work_date)}</span>
               )}
               <span className="text-right text-xs text-slate-500">
                 {showEmployee && showDate && <span className="block">{fmtDate(r.work_date)}</span>}
@@ -234,7 +234,7 @@ export function AttendanceTable({
                 )}
                 {showEmployee && (
                   <td className="min-w-44">
-                    <span className="flex items-center gap-2 whitespace-nowrap font-medium text-navy-900">
+                    <span className="flex items-center gap-2 whitespace-nowrap font-medium text-slate-900">
                       <Avatar name={r.member_name} size="sm" />
                       {employeeHref ? (
                         <Link href={employeeHref(r)} className="hover:underline" title={`Show only ${r.member_name}`}>
@@ -306,7 +306,7 @@ export function FlagList({
           <li key={f.id} className={`card border-l-4 p-4 ${f.status === 'Open' ? 'border-l-amber-500' : f.status === 'Reviewed' ? 'border-l-slate-400' : 'border-l-green-600'}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="font-medium text-navy-900">{f.flag_type}</div>
+                <div className="font-medium text-slate-900">{f.flag_type}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
                   <span>{fmtDate(f.work_date)}</span>
                 </div>
@@ -329,7 +329,7 @@ export function FlagList({
             </dl>
             <p className="mt-3 text-sm text-slate-700">{f.reason}</p>
             <div className="mt-3 rounded-lg bg-navy-50 px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your explanation</div>
+              <div className="text-[13px] font-medium text-slate-500">Your explanation</div>
               <p className={`mt-0.5 whitespace-pre-wrap ${f.employee_explanation ? 'text-slate-800' : 'text-slate-500'}`}>{f.employee_explanation || 'No explanation yet.'}</p>
             </div>
             {f.status !== 'Open' && (
@@ -398,7 +398,7 @@ export function CorrectionList({
           <li key={c.id} className={`card border-l-4 p-4 ${c.status === 'Pending' ? 'border-l-blue-500' : c.status === 'Approved' ? 'border-l-green-600' : 'border-l-slate-400'}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="font-medium text-navy-900">{mode === 'admin' ? names.get(c.member_id) ?? 'Former member' : fmtDate(c.work_date)}</div>
+                <div className="font-medium text-slate-900">{mode === 'admin' ? names.get(c.member_id) ?? 'Former member' : fmtDate(c.work_date)}</div>
                 <div className="mt-0.5 text-xs text-slate-500">
                   {mode === 'admin' && <>{fmtDate(c.work_date)} · </>}requested <LocalTime iso={c.created_at} />
                 </div>
@@ -413,7 +413,7 @@ export function CorrectionList({
             </dl>
             <p className="mt-1 text-xs text-slate-500">Office time ({tz})</p>
             <div className="mt-3 rounded-lg bg-navy-50 px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reason</div>
+              <div className="text-[13px] font-medium text-slate-500">Reason</div>
               <p className="mt-0.5 whitespace-pre-wrap text-slate-800">{c.reason}</p>
             </div>
             {c.status !== 'Pending' && (

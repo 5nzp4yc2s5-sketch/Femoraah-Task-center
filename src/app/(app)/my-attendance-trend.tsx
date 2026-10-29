@@ -40,17 +40,17 @@ export function MyAttendanceTrend({ rows, today, memberId }: { rows: AttendanceR
     <div className="card space-y-4 p-4">
       <div>
         <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-          <span className="font-medium text-navy-900">This week</span>
+          <span className="font-medium text-slate-900">This week</span>
           <span className="tabular-nums text-slate-600">
-            <strong className="text-navy-900">{fmtMinutes(weekWorked)}</strong> worked{weekTarget ? <> of {fmtMinutes(weekTarget)} scheduled</> : null}
+            <strong className="text-slate-900">{fmtMinutes(weekWorked)}</strong> worked{weekTarget ? <> of {fmtMinutes(weekTarget)} scheduled</> : null}
           </span>
         </div>
         {weekTarget > 0 && <Meter value={weekWorked} max={weekTarget} label={`Worked ${fmtMinutes(weekWorked)} of ${fmtMinutes(weekTarget)} this week`} />}
       </div>
       <div>
         <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-          <span className="font-medium text-navy-900">Last 14 days</span>
-          <span className="text-slate-600">{timed.length ? <>On time on <strong className="tabular-nums text-navy-900">{onTime}</strong> of {timed.length} days</> : 'No sign-ins yet'}</span>
+          <span className="font-medium text-slate-900">Last 14 days</span>
+          <span className="text-slate-600">{timed.length ? <>On time on <strong className="tabular-nums text-slate-900">{onTime}</strong> of {timed.length} days</> : 'No sign-ins yet'}</span>
         </div>
         <ol className="grid grid-cols-7 gap-1.5 sm:grid-cols-14">
           {days.map((d) => {
@@ -66,7 +66,7 @@ export function MyAttendanceTrend({ rows, today, memberId }: { rows: AttendanceR
                   aria-label={`${p.title}: ${detail}`}
                   className={`flex flex-col items-center rounded-lg px-1 py-1.5 text-center ring-1 ring-inset transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-navy-600 ${t.cls} ${d === today ? 'outline-2 outline-offset-1 outline-accent' : ''}`}
                 >
-                  <span className="text-[10px] uppercase leading-none opacity-80">{p.weekday.slice(0, 2)}</span>
+                  <span className="text-[10px] leading-none opacity-80">{p.weekday.slice(0, 2)}</span>
                   <span className="text-sm font-semibold leading-tight tabular-nums">{p.day}</span>
                   <span className="text-[10px] leading-none tabular-nums opacity-80">{r && r.worked_minutes ? `${(r.worked_minutes / 60).toFixed(1)}h` : '·'}</span>
                 </Link>

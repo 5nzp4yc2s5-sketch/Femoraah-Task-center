@@ -73,7 +73,7 @@ export default async function CompanySettingsPage() {
           <ActionForm action={uploadLogoAction} resetOnSuccess className="space-y-3">
             <div>
               <label className="label" htmlFor="logo">Upload a logo</label>
-              <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" required className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-navy-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-navy-900 hover:file:bg-navy-50" />
+              <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" required className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-navy-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-900 hover:file:bg-navy-50" />
               <p className="mt-1 text-xs text-slate-500">PNG, JPEG or WebP, up to 300 KB. A square image works best. SVG files are not accepted for security.</p>
             </div>
             <SubmitButton pendingText="Uploading…">Save logo</SubmitButton>

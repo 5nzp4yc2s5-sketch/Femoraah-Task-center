@@ -9,21 +9,21 @@ export async function AuthShell({ title, subtitle, children }: { title: string; 
         <div className="mb-6 flex items-center justify-center gap-3 text-white">
           {brand.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="" className="h-10 w-10 rounded-xl bg-white object-contain p-1" />
+            <img src={brand.logoUrl} alt="" className="h-11 w-11 rounded-xl bg-white object-contain p-1" />
           ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-base font-bold text-navy-800">{initials(brand.companyName)}</span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-base font-bold text-slate-900">{initials(brand.companyName)}</span>
           )}
           <span>
-            <span className="block text-lg font-semibold leading-tight">{brand.companyName}</span>
-            <span className="block text-xs uppercase tracking-wider text-navy-100/75">{brand.tagline}</span>
+            <span className="block text-lg font-semibold leading-tight tracking-tight">{brand.companyName}</span>
+            <span className="block text-sm text-white/70">{brand.tagline}</span>
           </span>
         </div>
-        <div className="rounded-2xl bg-white p-6 shadow-xl">
-          <h1 className="text-lg font-semibold text-navy-900">{title}</h1>
-          <p className="mb-5 mt-1 text-sm text-slate-600">{subtitle}</p>
+        <div className="rounded-2xl bg-white p-7 shadow-2xl shadow-black/20">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+          <p className="mb-6 mt-1.5 text-sm text-slate-600">{subtitle}</p>
           {children}
         </div>
-        <p className="mt-4 text-center text-xs text-navy-100/70">Private workspace. Accounts are created by the admin.</p>
+        <p className="mt-5 text-center text-xs text-white/60">Private workspace. Accounts are created by the admin.</p>
       </div>
     </main>
   );

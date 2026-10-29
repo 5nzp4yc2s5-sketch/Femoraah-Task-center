@@ -109,7 +109,7 @@ export default async function CredentialsPage({ searchParams }: { searchParams: 
                 <Link href={`/credentials/${c.id}`} className="card block p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-navy-900">{c.name}</div>
+                      <div className="font-medium text-slate-900">{c.name}</div>
                       <div className="truncate text-xs text-slate-600">{c.username || '—'}{c.url && ` · ${hostOf(c.url)}`}</div>
                     </div>
                     {c.category && <span className="shrink-0 rounded-full bg-navy-100 px-2 py-0.5 text-xs font-medium text-navy-800">{c.category}</span>}
@@ -136,7 +136,7 @@ export default async function CredentialsPage({ searchParams }: { searchParams: 
               <tbody>
                 {rows.map((c) => (
                   <tr key={c.id}>
-                    <td><Link href={`/credentials/${c.id}`} className="font-medium text-navy-900 hover:underline">{c.name}</Link></td>
+                    <td><Link href={`/credentials/${c.id}`} className="font-medium text-slate-900 hover:underline">{c.name}</Link></td>
                     <td className="whitespace-nowrap">
                       {c.url ? <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-navy-700 hover:underline">{hostOf(c.url)} <span aria-hidden>↗</span></a> : <span className="text-slate-400">—</span>}
                     </td>

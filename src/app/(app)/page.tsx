@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server';
 import { routinesFor, sortTasks } from '@/lib/data';
 import { addDays, fmtClock, fmtDate, fmtMinutes, friendlyError } from '@/lib/format';
 import type { AttendanceRow, CalendarEntry, CapacityStatus, RoutineRow, TaskRow } from '@/lib/types';
-import { PageHeader, SectionTitle, StatCard, Notice, EmptyState } from '@/components/ui';
-import { AttendanceBadge, Avatar, CapacityBadge } from '@/components/badges';
+import { PageHeader, SectionTitle, Notice, EmptyState } from '@/components/ui';
+import { FocusPanel } from '@/components/focus-panel';
+import { AttendanceBadge, Avatar } from '@/components/badges';
 import { LocalTime } from '@/components/local-time';
 import { TaskTable } from '@/components/task-table';
 import { RoutineTable } from '@/components/routine-table';
@@ -101,7 +102,6 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
   const myRoutines = routines.filter((r) => r.owner_id === me.memberId);
   const covering = (coveringData ?? []) as RoutineRow[];
   const activity = (activityData ?? []) as Activity[];
-  const routinesHref = (status: string) => `/routines?owner=${me.memberId}&status=${encodeURIComponent(status)}`;
 
   return (
     <>
@@ -116,8 +116,9 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
             <Link href="/backlog/new" className="btn-secondary">Add to backlog</Link>
           </>
         }
-      />
-      <QuoteCard quote={((quoteData ?? []) as { body: string; author: string }[])[0] ?? null} />
+      >
+        <QuoteCard quote={((quoteData ?? []) as { body: string; author: string }[])[0] ?? null} />
+      </PageHeader>
       {summaryError && <Notice tone="error">Could not load your summary: {friendlyError(summaryError.message)}</Notice>}
       {tasksError && <Notice tone="error">Could not load your tasks: {friendlyError(tasksError.message)}</Notice>}
       {summary?.on_leave && <Notice>You are on leave today.</Notice>}
@@ -128,36 +129,9 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
         </Notice>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        <StatCard label="My open tasks" value={summary?.open ?? 0} hint={`Capacity ${summary?.open ?? 0}/${summary?.max_open_tasks ?? '—'}`} href="/tasks?scope=mine" />
-        <StatCard label="Due today" value={summary?.due_today ?? 0} tone={summary?.due_today ? 'amber' : 'default'} href="/tasks?scope=mine&due=today" />
-        <StatCard label="Overdue" value={summary?.overdue ?? 0} tone={summary?.overdue ? 'red' : 'default'} href="/tasks?scope=mine&flag=Overdue" />
-        <StatCard label="Blocked" value={summary?.blocked ?? 0} tone={summary?.blocked ? 'orange' : 'default'} href="/tasks?scope=mine&status=Blocked" />
-        <StatCard label="Due next 7 days" value={summary?.due_next_7 ?? 0} tone={summary?.due_next_7 ? 'amber' : 'default'} href="/tasks?scope=mine&due=week" />
-        <StatCard label="No update 3+ days" value={summary?.stale ?? 0} tone={summary?.stale ? 'amber' : 'default'} href="/tasks?scope=mine&stale=1" />
-        <StatCard label="Routines due today" value={summary?.routine_due_today ?? 0} tone={summary?.routine_due_today ? 'amber' : 'default'} href={routinesHref('Due Today')} />
-        <StatCard
-          label="Routine overdue"
-          value={summary?.routine_overdue ?? 0}
-          tone={summary?.routine_overdue ? 'red' : 'default'}
-          hint={`${summary?.routine_not_logged ?? 0} not logged yet`}
-          href={routinesHref('Overdue')}
-        />
-      </div>
-      {summary && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-600">
-          <span>
-            Workload: <strong className="tabular-nums text-navy-900">{summary.open}</strong> of {summary.max_open_tasks} open tasks
-          </span>
-          <CapacityBadge status={summary.capacity_status} />
-          <span>
-            · Routines: <strong className="tabular-nums text-navy-900">{summary.routine_ok}</strong> of {summary.routines_active} up to date
-            {summary.routine_not_logged > 0 && <>, {summary.routine_not_logged} not logged yet</>}
-          </span>
-        </div>
-      )}
+      {summary && <FocusPanel summary={summary} memberId={me.memberId} />}
 
-      <SectionTitle action={<Link href="/tasks?scope=mine" className="text-sm text-navy-700 hover:underline">All my tasks →</Link>}>My open tasks</SectionTitle>
+      <SectionTitle action={<Link href="/tasks?scope=mine" className="link text-sm">See all my tasks</Link>}>My open tasks</SectionTitle>
       <TaskTable rows={myOpen} compact empty={{ title: 'Nothing open', body: 'Tasks assigned to you will appear here.' }} />
 
       {upcoming.length > 0 && (
@@ -167,7 +141,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
         </>
       )}
 
-      <SectionTitle action={<Link href="/routines" className="text-sm text-navy-700 hover:underline">All routines →</Link>}>My routine tasks</SectionTitle>
+      <SectionTitle action={<Link href="/routines" className="link text-sm">See all routines</Link>}>My routine tasks</SectionTitle>
       <RoutineTable rows={myRoutines} canComplete={() => true} today={today ?? ''} showOwner={false} />
 
       {covering.length > 0 && (
@@ -179,7 +153,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
 
       <div className="grid gap-x-6 lg:grid-cols-2">
         <section>
-          <SectionTitle action={<Link href="/attendance" className="text-sm text-navy-700 hover:underline">Attendance →</Link>}>My attendance today</SectionTitle>
+          <SectionTitle action={<Link href="/attendance" className="link text-sm">Open attendance</Link>}>My attendance today</SectionTitle>
           {attendance?.error ? (
             <Notice tone="error">Could not load your attendance: {friendlyError(attendance.error.message)}</Notice>
           ) : !attendanceToday ? (
@@ -197,14 +171,14 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
                 <div>
                   <dt className="label">Signed in</dt>
                   <dd className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold tabular-nums text-navy-900">{fmtClock(attendanceToday.first_login, attendanceToday.tz)}</span>
+                    <span className="font-semibold tabular-nums text-slate-900">{fmtClock(attendanceToday.first_login, attendanceToday.tz)}</span>
                     <AttendanceBadge status={attendanceToday.login_status} />
                   </dd>
                 </div>
                 <div>
                   <dt className="label">Signed out</dt>
                   <dd className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold tabular-nums text-navy-900">{fmtClock(attendanceToday.last_logout, attendanceToday.tz)}</span>
+                    <span className="font-semibold tabular-nums text-slate-900">{fmtClock(attendanceToday.last_logout, attendanceToday.tz)}</span>
                     <AttendanceBadge status={attendanceToday.logout_status} />
                   </dd>
                 </div>
@@ -245,7 +219,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
         </section>
 
         <section>
-          <SectionTitle action={<Link href="/calendar" className="text-sm text-navy-700 hover:underline">Team Calendar →</Link>}>Upcoming leave and holidays</SectionTitle>
+          <SectionTitle action={<Link href="/calendar" className="link text-sm">Open team calendar</Link>}>Upcoming leave and holidays</SectionTitle>
           {calendar?.error ? (
             <Notice tone="error">Could not load the team calendar: {friendlyError(calendar.error.message)}</Notice>
           ) : upcoming30.length === 0 ? (
@@ -255,13 +229,13 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
               {upcoming30.map((e) => (
                 <li key={`${e.kind}-${e.id}`} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                   <div className="min-w-0">
-                    <div className="font-medium text-navy-900">
+                    <div className="font-medium text-slate-900">
                       {e.kind === 'holiday' ? e.label : e.member_name}
                       {e.member_id === me.memberId && <span className="ml-1.5 text-xs font-normal text-slate-500">(you)</span>}
                     </div>
                     <div className="text-xs text-slate-500">
                       {e.kind === 'holiday' ? 'Company holiday' : e.label}
-                      {e.backup_name && <> · Backup: {e.backup_member_id === me.memberId ? <strong className="text-navy-900">you</strong> : e.backup_name}</>}
+                      {e.backup_name && <> · Backup: {e.backup_member_id === me.memberId ? <strong className="text-slate-900">you</strong> : e.backup_name}</>}
                     </div>
                   </div>
                   <div className="whitespace-nowrap text-right text-xs tabular-nums text-slate-600">
@@ -275,7 +249,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
         </section>
       </div>
 
-      <SectionTitle action={<Link href="/tasks?scope=assigned" className="text-sm text-navy-700 hover:underline">All →</Link>}>Tasks I delegated to others</SectionTitle>
+      <SectionTitle action={<Link href="/tasks?scope=assigned" className="link text-sm">See all</Link>}>Tasks I delegated to others</SectionTitle>
       <TaskTable rows={delegated} compact empty={{ title: 'You have not delegated any open tasks', body: 'Tasks where you are Delegated by stay visible here so you can track them.' }} />
 
       <SectionTitle>Recent changes</SectionTitle>
@@ -290,11 +264,11 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
               <Avatar name={a.actor_name ?? '?'} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="break-words text-sm text-slate-800">
-                  <span className="font-medium text-navy-900">{a.actor_name ?? 'Someone'}</span> · {a.summary}
+                  <span className="font-medium text-slate-900">{a.actor_name ?? 'Someone'}</span> · {a.summary}
                 </p>
                 <p className="mt-0.5 break-words text-xs text-slate-500">
                   <Link href={`/tasks/${a.task_id}`} className="hover:underline">
-                    <span className="font-mono">{a.task_code}</span> {a.title}
+                    <span className="tabular-nums">{a.task_code}</span> {a.title}
                   </Link>{' '}
                   · <LocalTime iso={a.at} mode="relative" />
                 </p>

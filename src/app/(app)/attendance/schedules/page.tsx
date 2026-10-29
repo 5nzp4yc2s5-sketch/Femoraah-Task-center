@@ -86,11 +86,11 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Pr
             {current.map(({ member, now, next }) => (
               <li key={member.id} className="card p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2 font-medium text-navy-900">
+                  <span className="flex min-w-0 items-center gap-2 font-medium text-slate-900">
                     <Avatar name={member.name} size="sm" />
                     <span className="truncate">{member.name}</span>
                   </span>
-                  <Link href={`/attendance/schedules?member=${member.id}#set`} className="text-sm text-navy-700 hover:underline">Change</Link>
+                  <Link href={`/attendance/schedules?member=${member.id}#set`} className="link text-sm">Change</Link>
                 </div>
                 {now?.start_time ? (
                   <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
@@ -131,7 +131,7 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Pr
                 {current.map(({ member, now, next }) => (
                   <tr key={member.id} className={member.id === selected ? 'bg-navy-100' : ''}>
                     <td className="whitespace-nowrap">
-                      <span className="flex items-center gap-2 font-medium text-navy-900">
+                      <span className="flex items-center gap-2 font-medium text-slate-900">
                         <Avatar name={member.name} size="sm" />
                         {member.name}
                       </span>
@@ -157,7 +157,7 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Pr
                       <td colSpan={8} className="text-slate-500">No schedule yet. Attendance shows &ldquo;No Schedule&rdquo; until one starts.</td>
                     )}
                     <td className="whitespace-nowrap">
-                      <Link href={`/attendance/schedules?member=${member.id}#set`} className="text-sm text-navy-700 hover:underline">Change</Link>
+                      <Link href={`/attendance/schedules?member=${member.id}#set`} className="link text-sm">Change</Link>
                     </td>
                   </tr>
                 ))}
@@ -268,7 +268,7 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Pr
             .sort((a, b) => (names.get(a[0]) ?? '').localeCompare(names.get(b[0]) ?? ''))
             .map(([memberId, list]) => (
               <details key={memberId} className="card p-3" open={memberId === selected}>
-                <summary className="cursor-pointer font-medium text-navy-900">
+                <summary className="cursor-pointer font-medium text-slate-900">
                   {names.get(memberId) ?? 'Former member'} <span className="text-xs font-normal text-slate-500">· {list.length} schedule{list.length === 1 ? '' : 's'}</span>
                 </summary>
                 <div className="mt-3 overflow-x-auto">

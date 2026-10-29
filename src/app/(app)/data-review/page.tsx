@@ -38,7 +38,7 @@ export default async function DataReview() {
               <span className="rounded bg-navy-100 px-1.5 py-0.5 font-semibold text-navy-800">{r.source_file}{r.source_row ? ` · row ${r.source_row}` : ''}</span>
               <span className={`rounded px-1.5 py-0.5 font-semibold ${r.status === 'Open' ? 'bg-amber-100 text-amber-900' : 'bg-green-100 text-green-800'}`}>{r.status}</span>
             </div>
-            <p className="mt-2 font-medium text-navy-900">{r.issue}</p>
+            <p className="mt-2 font-medium text-slate-900">{r.issue}</p>
             <p className="mt-1 text-sm text-slate-600">{r.suggested_action}</p>
             <details className="mt-2">
               <summary className="cursor-pointer text-xs text-slate-500">Original row</summary>

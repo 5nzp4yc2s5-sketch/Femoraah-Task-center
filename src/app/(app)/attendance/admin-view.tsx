@@ -204,7 +204,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch; tod
           </select>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-span-4 lg:col-span-6">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Only show</span>
+          <span className="text-[13px] font-medium text-slate-600">Only show</span>
           <label className="flex items-center gap-1.5 text-sm text-slate-700">
             <input type="checkbox" name="late" value="1" defaultChecked={f.late} /> Late
           </label>
@@ -260,7 +260,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch; tod
       <TimeZoneNote zones={shown.map((r) => r.tz)} />
 
       <section id="flags" className="scroll-mt-4">
-        <SectionTitle action={<Link href={exceptionsHref} className="text-sm text-navy-700 hover:underline">Open the exception queue →</Link>}>
+        <SectionTitle action={<Link href={exceptionsHref} className="link text-sm">Open the exception queue</Link>}>
           Exceptions to review ({openExceptions})
         </SectionTitle>
         {flagRes.error ? (
@@ -301,7 +301,7 @@ export async function AdminAttendance({ sp, today }: { sp: AttendanceSearch; tod
                   const mins = b.end_at ? Math.floor((new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000) : null;
                   return (
                     <tr key={b.id}>
-                      <td className="whitespace-nowrap font-medium text-navy-900">{names.get(b.member_id) ?? 'Former member'}</td>
+                      <td className="whitespace-nowrap font-medium text-slate-900">{names.get(b.member_id) ?? 'Former member'}</td>
                       <td className="whitespace-nowrap tabular-nums">{fmtDate(b.work_date)}</td>
                       <td className="tabular-nums">{fmtClock(b.start_at, tz)}</td>
                       <td className="whitespace-nowrap tabular-nums">

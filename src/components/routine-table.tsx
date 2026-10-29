@@ -2,16 +2,10 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { RoutineRow } from '@/lib/types';
 import { fmtDate } from '@/lib/format';
-import { RoutineStatusBadge } from './badges';
+import { RoutineStatusBadge, routineEdge } from './badges';
 import { EmptyState } from './ui';
 import { LocalTime } from './local-time';
 import { MarkDone } from './mark-done';
-
-const rowTone: Record<string, string> = {
-  Overdue: 'bg-red-50/70',
-  'Due Today': 'bg-amber-50/70',
-  OK: 'bg-done/40',
-};
 
 /** "Zinia covering while Dev is on leave", or a note that nobody is covering. Ownership never changes. */
 export function CoverNote({ r, viewerId }: { r: RoutineRow; viewerId?: string }) {
@@ -57,20 +51,20 @@ export function RoutineTable({
     <>
       <ul className="space-y-2 md:hidden">
         {rows.map((r) => (
-          <li key={r.id} className="card p-3">
+          <li key={r.id} className="card p-3.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-xs text-slate-500">{r.routine_code}</div>
-                <Link href={`/routines/${r.id}`} className="font-medium text-navy-900 hover:underline">{r.title}</Link>
+                <Link href={`/routines/${r.id}`} className="font-medium text-slate-900 hover:underline">{r.title}</Link>
               </div>
               <RoutineStatusBadge status={r.status} />
             </div>
             <CoverNote r={r} viewerId={viewerId} />
             <ViewerTag r={r} viewerId={viewerId} />
             <div className="mt-1 text-xs text-slate-600">
-              {showOwner && <>Assigned to {r.owner_name} · </>}
-              {r.backup_name && <>Backup {r.backup_name} · </>}
-              {r.frequency} (every {r.every_n_days}d) · Last {fmtDate(r.last_done)} · Next {fmtDate(r.next_due)}
+              {showOwner && <>Assigned to {r.owner_name}. </>}
+              {r.backup_name && <>Backup {r.backup_name}. </>}
+              {r.frequency} (every {r.every_n_days}d), last {fmtDate(r.last_done)}, next {fmtDate(r.next_due)}
             </div>
             {r.notes && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{r.notes}</p>}
             {canComplete(r) && r.is_active && (
@@ -100,11 +94,11 @@ export function RoutineTable({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className={rowTone[r.status] ?? ''}>
-                <td className="whitespace-nowrap font-mono text-xs">
+              <tr key={r.id} className={routineEdge[r.status] ?? ''}>
+                <td className="whitespace-nowrap text-xs text-slate-500">
                   <Link href={`/routines/${r.id}`} className="hover:underline">{r.routine_code}</Link>
                 </td>
-                <td className="min-w-56 font-medium text-navy-900">
+                <td className="min-w-56 font-medium text-slate-900">
                   <Link href={`/routines/${r.id}`} className="hover:underline">{r.title}</Link>
                   <CoverNote r={r} viewerId={viewerId} />
                   <ViewerTag r={r} viewerId={viewerId} />

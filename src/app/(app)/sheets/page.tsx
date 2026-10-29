@@ -154,9 +154,9 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       {canEdit(s) || canAdmin ? (
-                        <Link href={`/sheets/${s.id}`} className="font-medium text-navy-900 hover:underline">{s.name}</Link>
+                        <Link href={`/sheets/${s.id}`} className="font-medium text-slate-900 hover:underline">{s.name}</Link>
                       ) : (
-                        <span className="font-medium text-navy-900">{s.name}</span>
+                        <span className="font-medium text-slate-900">{s.name}</span>
                       )}
                       {s.purpose && <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{s.purpose}</p>}
                     </div>
@@ -199,9 +199,9 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
                     <tr key={s.id}>
                       <td className="min-w-40">
                         {canEdit(s) || canAdmin ? (
-                          <Link href={`/sheets/${s.id}`} className="font-medium text-navy-900 hover:underline">{s.name}</Link>
+                          <Link href={`/sheets/${s.id}`} className="font-medium text-slate-900 hover:underline">{s.name}</Link>
                         ) : (
-                          <span className="font-medium text-navy-900">{s.name}</span>
+                          <span className="font-medium text-slate-900">{s.name}</span>
                         )}
                         {s.visibility === 'assigned' && <div className="text-xs text-slate-500">Only people on it</div>}
                       </td>

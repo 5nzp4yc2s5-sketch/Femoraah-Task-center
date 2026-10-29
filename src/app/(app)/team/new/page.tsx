@@ -15,7 +15,7 @@ export default async function NewMember() {
       <ActionForm action={createMemberAction} className="card space-y-6 p-5">
         <MemberFields />
         <fieldset className="rounded-lg border border-line p-4">
-          <legend className="px-1 text-sm font-semibold text-navy-900">Login (optional now, can be added later)</legend>
+          <legend className="px-1 text-sm font-semibold text-slate-900">Login (optional now, can be added later)</legend>
           <LoginFields optional />
         </fieldset>
         <div className="flex justify-end gap-2">

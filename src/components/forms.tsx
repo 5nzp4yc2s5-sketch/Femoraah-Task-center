@@ -104,10 +104,10 @@ export function ConfirmAction({
       <dialog
         ref={dialog}
         onClose={() => setOpen(false)}
-        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-xl backdrop:bg-navy-950/40"
+        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-xl backdrop:bg-slate-900/40"
       >
         <form action={formAction} className="p-5">
-          <h2 className="text-base font-semibold text-navy-900">{title}</h2>
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <p className="mt-2 text-sm text-slate-600">{body}</p>
           {hidden && Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           {withNote && <textarea name="note" rows={2} className="input mt-3" placeholder="Reason (optional)" maxLength={1000} />}

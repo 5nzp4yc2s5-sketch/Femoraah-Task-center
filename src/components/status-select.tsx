@@ -4,11 +4,12 @@ import { startTransition, useActionState, useEffect, useRef, useState } from 're
 import { quickStatusAction, toggleFlagAction } from '@/app/(app)/tasks/actions';
 import { STATUSES, type TaskStatus } from '@/lib/types';
 
+// Same colours as StatusBadge, so a status you can change looks like one you cannot, plus a chevron.
 const tone: Record<TaskStatus, string> = {
-  'To Do': 'border-slate-300 bg-slate-50 text-slate-700',
-  Active: 'border-blue-200 bg-blue-50 text-blue-800',
-  Blocked: 'border-orange-300 bg-orange-100 text-orange-800',
-  Done: 'border-green-300 bg-green-100 text-green-800',
+  'To Do': 'bg-slate-100 text-slate-700 hover:bg-slate-200/70',
+  Active: 'bg-blue-50 text-blue-700 hover:bg-blue-100/70',
+  Blocked: 'bg-orange-50 text-orange-700 hover:bg-orange-100/70',
+  Done: 'bg-green-50 text-green-700 hover:bg-green-100/70',
 };
 
 /**
@@ -44,7 +45,7 @@ export function StatusSelect({ id, status, blocker }: { id: string; status: Task
     <>
       <select
         aria-label="Change status"
-        className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${tone[value]} ${pending ? 'opacity-60' : ''}`}
+        className={`cursor-pointer rounded-full border-0 py-0.5 pl-2 pr-1 text-xs font-medium transition-colors ${tone[value]} ${pending ? 'opacity-60' : ''}`}
         value={value}
         disabled={pending}
         onChange={(e) => {
@@ -68,7 +69,7 @@ export function StatusSelect({ id, status, blocker }: { id: string; status: Task
       <dialog
         ref={dialog}
         onClose={() => setAsking(false)}
-        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-xl backdrop:bg-navy-950/40"
+        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-xl backdrop:bg-slate-900/40"
       >
         <form
           className="p-5"
@@ -79,7 +80,7 @@ export function StatusSelect({ id, status, blocker }: { id: string; status: Task
             submit('Blocked', reason.trim());
           }}
         >
-          <h2 className="text-base font-semibold text-navy-900">What is blocking this task?</h2>
+          <h2 className="text-base font-semibold text-slate-900">What is blocking this task?</h2>
           <p className="mt-1 text-sm text-slate-600">The reason is shown on the Task Board and to whoever delegated the task.</p>
           <label className="label mt-3" htmlFor={`blocker-${id}`}>Blocker reason</label>
           <input

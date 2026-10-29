@@ -58,16 +58,16 @@ export interface ContrastCheck {
 }
 
 /**
- * Readability rules: white text must be readable on the primary colour (buttons, table headers)
- * and on its lighter link shade against white, white text on the secondary colour (the menu), and
+ * Readability rules: white text must be readable on the primary colour (buttons) and its link
+ * shade must read on white, white text on the secondary colour (the selected menu item), and
  * the accent must stand out from a white page.
  */
 export function brandChecks(c: { primary: string; secondary: string; accent: string }): ContrastCheck[] {
   const link = primaryScale(c.primary)[700];
   const primaryRatio = Math.min(contrast('#ffffff', c.primary), contrast('#ffffff', link));
   return [
-    { key: 'primary', label: 'White text on buttons, headers and links', ratio: primaryRatio, needed: 4.5, ok: primaryRatio >= 4.5 },
-    { key: 'secondary', label: 'White text on the menu', ratio: contrast('#ffffff', c.secondary), needed: 4.5, ok: contrast('#ffffff', c.secondary) >= 4.5 },
+    { key: 'primary', label: 'White text on buttons, and links on white', ratio: primaryRatio, needed: 4.5, ok: primaryRatio >= 4.5 },
+    { key: 'secondary', label: 'White text on the selected menu item', ratio: contrast('#ffffff', c.secondary), needed: 4.5, ok: contrast('#ffffff', c.secondary) >= 4.5 },
     { key: 'accent', label: 'Accent against a white page', ratio: contrast('#ffffff', c.accent), needed: 3, ok: contrast('#ffffff', c.accent) >= 3 },
   ];
 }

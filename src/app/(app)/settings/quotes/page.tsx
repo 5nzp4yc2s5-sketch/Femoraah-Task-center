@@ -71,7 +71,7 @@ export default async function QuotesPage() {
                   <p className="text-sm text-slate-900">“{q.body}”</p>
                   <p className="mt-0.5 text-xs text-slate-500">
                     {q.author || 'No author'} ·{' '}
-                    {q.id === todays ? <strong className="text-navy-900">Today&apos;s quote</strong> : shown.get(q.id) ? `Shown ${shown.get(q.id)!.count}× · last ${fmtDate(shown.get(q.id)!.last)}` : 'Not shown yet'}
+                    {q.id === todays ? <strong className="text-slate-900">Today&apos;s quote</strong> : shown.get(q.id) ? `Shown ${shown.get(q.id)!.count}× · last ${fmtDate(shown.get(q.id)!.last)}` : 'Not shown yet'}
                   </p>
                 </div>
                 <QuoteRowActions quote={q} first={i === 0} last={i === active.length - 1} />

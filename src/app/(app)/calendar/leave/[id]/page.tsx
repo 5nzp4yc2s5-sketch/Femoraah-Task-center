@@ -54,7 +54,7 @@ export default async function EditLeave({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-3xl">
-      <Link href={back} className="text-sm text-navy-700 hover:underline">← Team Calendar</Link>
+      <Link href={back} className="link text-sm">← Team Calendar</Link>
       <div className="mt-2">
         <PageHeader
           title={canEdit ? 'Edit leave' : 'Leave'}
