@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-type Item = { href: string; label: string; icon: string; managerOnly?: boolean; settingsOnly?: boolean };
+type Item = { href: string; label: string; icon: string; managerOnly?: boolean; settingsOnly?: boolean; financeOnly?: boolean };
 
 const ITEMS: Item[] = [
   { href: '/', label: 'My Dashboard', icon: 'M3 12l9-9 9 9M5 10v10h14V10' },
@@ -13,6 +13,7 @@ const ITEMS: Item[] = [
   { href: '/backlog', label: 'Pending Backlog', icon: 'M20 13V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6m16 0v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4m16 0h-5l-1 2h-4l-1-2H4' },
   { href: '/routines', label: 'Routine Tasks', icon: 'M4 4v5h5M20 20v-5h-5M5.6 15a7 7 0 0012.3 2M18.4 9A7 7 0 006.1 7' },
   { href: '/calendar', label: 'Team Calendar', icon: 'M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z' },
+  { href: '/finance', label: 'Cash Flow', icon: 'M3 7h18v10H3zM7 7v10M17 7v10M12 10.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z', financeOnly: true },
   { href: '/sheets', label: 'Google Sheets', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 10h16M4 15h16M10 4v16' },
   { href: '/credentials', label: 'Credentials', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.7 5.7L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.6a1 1 0 01.3-.7l6-6A6 6 0 1121 9z' },
   { href: '/attendance', label: 'Attendance', icon: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
@@ -43,6 +44,7 @@ export function Sidebar({
   role,
   isManager,
   canSettings,
+  canFinance = false,
   signOut,
   brand: b,
 }: {
@@ -51,6 +53,8 @@ export function Sidebar({
   isManager: boolean;
   /** Can open Settings (attendance or company settings area). */
   canSettings: boolean;
+  /** Can open Cash Flow (Super Admin or Finance access). */
+  canFinance?: boolean;
   signOut: () => Promise<void>;
   brand: SidebarBrand;
 }) {
@@ -60,7 +64,7 @@ export function Sidebar({
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4" aria-label="Main">
-      {ITEMS.filter((i) => (!i.managerOnly || isManager) && (!i.settingsOnly || canSettings)).map((i) => (
+      {ITEMS.filter((i) => (!i.managerOnly || isManager) && (!i.settingsOnly || canSettings) && (!i.financeOnly || canFinance)).map((i) => (
         <Link
           key={i.href}
           href={i.href}

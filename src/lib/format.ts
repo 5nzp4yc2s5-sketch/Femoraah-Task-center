@@ -32,6 +32,8 @@ export function friendlyError(message: string | undefined | null): string {
   if (/invalid input value for enum/i.test(message)) return 'That value is not one of the allowed options.';
   if (/attendance_one_open_break/i.test(message)) return 'You are already on a break.';
   if (/work_sheets_key_active/i.test(message)) return 'This sheet link is already in the workspace.';
+  if (/fin_transactions_reference/i.test(message)) return 'A transaction with this reference number is already recorded for this account.';
+  if (/fin_payables_series_date/i.test(message)) return 'This repeating payment already has an entry on that date.';
   if (/break_minutes_check|grace_minutes_check/i.test(message)) return 'The break must be 0–240 minutes and the grace period 0–120 minutes.';
   return message.replace(/^.*?ERROR:\s*/, '');
 }

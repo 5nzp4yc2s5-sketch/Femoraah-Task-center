@@ -81,6 +81,21 @@ export async function requireAdmin(): Promise<Me> {
   return me;
 }
 
+/** The Super Admin always; anyone else only when the Super Admin has given them Finance access. */
+export const getFinanceAccess = cache(async (role: AccessRole): Promise<boolean> => {
+  if (role === 'admin') return true;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc('my_finance_access');
+  return data === true;
+});
+
+/** Cash Flow pages: the Super Admin and people with Finance access. */
+export async function requireFinance(): Promise<Me> {
+  const me = await requireMe();
+  if (!(await getFinanceAccess(me.role))) redirect('/?error=finance-only');
+  return me;
+}
+
 /** The Super Admin, or an Admin who has been given this area. */
 export async function requireArea(area: AdminArea): Promise<Me> {
   const me = await requireMe();

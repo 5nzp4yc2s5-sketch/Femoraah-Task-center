@@ -165,3 +165,15 @@ export async function setAreasAction(_prev: ActionState, formData: FormData): Pr
   revalidatePath('/', 'layout');
   return { ok: areas.data.length ? 'Admin areas saved.' : 'Admin areas removed. They keep the Admin role.' };
 }
+
+export async function setFinanceAccessAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const id = z.uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Unknown member.' };
+  const on = formData.get('finance') === 'on';
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('finance_set_access', { p_member: id.data, p_on: on });
+  if (error) return { error: friendlyError(error.message) };
+  revalidatePath('/', 'layout');
+  return { ok: on ? 'Finance access given. They can now open Cash Flow.' : 'Finance access removed.' };
+}

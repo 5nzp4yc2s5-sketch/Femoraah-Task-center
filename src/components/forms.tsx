@@ -75,6 +75,8 @@ export function ConfirmAction({
   className = 'btn-danger',
   hidden,
   withNote = false,
+  noteRequired = false,
+  notePlaceholder,
 }: {
   action: Action;
   label: string;
@@ -84,6 +86,9 @@ export function ConfirmAction({
   className?: string;
   hidden?: Record<string, string>;
   withNote?: boolean;
+  /** The note must be filled in (shown as "Reason" instead of "Reason (optional)"). */
+  noteRequired?: boolean;
+  notePlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(action, undefined);
@@ -110,7 +115,17 @@ export function ConfirmAction({
           <h2 className="text-base font-semibold text-navy-900">{title}</h2>
           <p className="mt-2 text-sm text-slate-600">{body}</p>
           {hidden && Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-          {withNote && <textarea name="note" rows={2} className="input mt-3" placeholder="Reason (optional)" maxLength={1000} />}
+          {withNote && (
+            <textarea
+              name="note"
+              rows={2}
+              className="input mt-3"
+              placeholder={notePlaceholder ?? (noteRequired ? 'Reason' : 'Reason (optional)')}
+              aria-label={noteRequired ? 'Reason' : 'Reason (optional)'}
+              required={noteRequired}
+              maxLength={1000}
+            />
+          )}
           {state?.error && <p className="mt-3 text-sm text-red-700">{state.error}</p>}
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>

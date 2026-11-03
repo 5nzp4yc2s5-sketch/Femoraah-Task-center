@@ -910,3 +910,154 @@ test('Phase 5: attendance at a glance on the dashboards, with filters, trends an
   await expect(phone.getByRole('heading', { name: 'Attendance today' })).toBeVisible();
   await phone.screenshot({ path: `${SHOTS}/36-dashboard-mobile.png`, fullPage: true });
 });
+
+test('Cash Flow: only the Super Admin and people given Finance access; balances, payments due, EMIs and the forecast', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const admin = await as(browser, ADMIN);
+  const zinia = await as(browser, PEOPLE.Zinia);
+
+  // An Employee without Finance access sees no Cash Flow and cannot open it by URL
+  await expect(zinia.locator('aside').getByRole('link', { name: 'Cash Flow' })).toHaveCount(0);
+  await zinia.goto('/finance/payables');
+  await expect(zinia).toHaveURL(/error=finance-only/);
+  await expect(zinia.getByText('Cash Flow is for the Super Admin and people with Finance access.')).toBeVisible();
+
+  // The Super Admin starts with an empty overview and adds the bank account with today's balance
+  await admin.goto('/');
+  await admin.locator('aside').getByRole('link', { name: 'Cash Flow' }).click();
+  await expect(admin.getByText('Start with your bank accounts')).toBeVisible();
+  await admin.getByRole('link', { name: 'Add a bank account' }).click();
+  await admin.getByLabel('Account name').fill('HDFC Current');
+  await admin.getByLabel('Bank', { exact: true }).fill('HDFC Bank');
+  await admin.getByLabel('Last 4 digits of the account number').fill('1234');
+  await admin.getByLabel('Current balance').fill('15,00,000');
+  await admin.getByRole('button', { name: 'Add account' }).click();
+  await expect(admin.getByText('Account added with its opening balance.')).toBeVisible();
+  await expect(admin.locator('table').getByRole('row', { name: /HDFC Current ••1234/ })).toContainText('₹15,00,000');
+
+  // Payments due: Vendor A ₹4L, Vendor B ₹2L, Marketing ₹2L
+  const addPayable = async (title: string, amount: string, due: string, priority: RegExp, category?: string) => {
+    await admin.goto('/finance/payables/new');
+    await admin.getByLabel('What is it for').fill(title);
+    await admin.getByLabel('Amount').fill(amount);
+    await admin.getByLabel('Due date').fill(due);
+    if (category) await admin.getByLabel('Category').selectOption({ label: category });
+    await admin.getByRole('radio', { name: priority }).check();
+    await admin.getByRole('button', { name: 'Add payment due' }).click();
+    await expect(admin.getByText('Payment due added. It is now in the forecast.')).toBeVisible();
+    return admin.url();
+  };
+  const vendorA = await addPayable('Vendor A', '4,00,000', isoIn(2), /^High/);
+  const vendorB = await addPayable('Vendor B', '2,00,000', isoIn(7), /^Medium/);
+  const marketing = await addPayable('Marketing', '2,00,000', isoIn(12), /^Low/, 'Marketing');
+
+  // A loan: its EMIs are planned for you, once each, as critical payments
+  await admin.goto('/finance/loans/new');
+  await admin.getByLabel('Loan name').fill('Business loan');
+  await admin.getByLabel('Lender').fill('Bajaj Finance');
+  await admin.getByLabel('Loan amount').fill('18,00,000');
+  await admin.getByLabel('Principal still outstanding').fill('18,00,000');
+  await admin.getByLabel('EMI amount').fill('1,50,000');
+  await admin.getByLabel('First EMI date').fill(isoIn(5));
+  await admin.getByLabel('Number of EMIs in total').fill('12');
+  await admin.getByRole('button', { name: 'Add loan' }).click();
+  await expect(admin.getByText('Loan added. Its EMIs for the next 90 days are in Payments due.')).toBeVisible();
+  await expect(admin.locator('table').getByRole('row', { name: /EMI 1 of 12/ })).toBeVisible();
+  await admin.reload();
+  await expect(admin.locator('table').getByRole('row', { name: /EMI 1 of 12/ })).toHaveCount(1);
+
+  // Overview: ₹15L now; ₹15L − 4L − 2L − 2L − 1.5L = ₹5.5L in 30 days; alerts for what is close
+  await admin.goto('/finance');
+  await expect(admin.getByText('Cash available now').locator('..')).toContainText('₹15,00,000');
+  await expect(admin.getByText('Projected in 30 days').locator('..')).toContainText('₹5,50,000');
+  await expect(admin.getByText('EMIs in the next 30 days').locator('..')).toContainText('₹1,50,000');
+  await expect(admin.getByText('Payment due within 3 days.')).toBeVisible();
+  await expect(admin.getByText('EMI coming up.')).toBeVisible();
+  await expect(admin.getByText('Cash health: Healthy.')).toBeVisible();
+
+  // A minimum cash of ₹6L: the forecast now warns, and nothing is moved automatically
+  await admin.goto('/finance/accounts');
+  await admin.getByLabel('Minimum cash to keep').fill('6,00,000');
+  await admin.getByRole('button', { name: 'Save alert amounts' }).click();
+  await expect(admin.getByText('Saved. Alerts use these amounts from now on.')).toBeVisible();
+  await admin.goto('/finance');
+  await expect(admin.getByText('Cash health: Watch closely.')).toBeVisible();
+  await expect(admin.getByText('Cash falls below your minimum.')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/40-cashflow-overview.png`, fullPage: true });
+
+  // Pay part of Vendor A: it becomes partially paid and the bank transaction is added
+  await admin.goto(vendorA);
+  await admin.getByLabel('Amount paid').fill('1,00,000');
+  await admin.getByLabel('Reference number').fill('UTR0001');
+  await admin.getByRole('button', { name: 'Record payment' }).click();
+  await expect(admin.getByText('Payment recorded, and the bank transaction added.')).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByText('Partially paid')).toBeVisible();
+  await expect(admin.getByText('Still to pay').locator('..')).toContainText('₹3,00,000');
+
+  // The same bank reference cannot be entered twice for one account
+  await admin.goto('/finance/transactions/new');
+  await admin.getByLabel('Amount').fill('500');
+  await admin.getByLabel('Category').selectOption({ label: 'Other operating expenses' });
+  await admin.getByLabel('Reference number').fill('utr0001');
+  await admin.getByRole('button', { name: 'Add transaction' }).click();
+  await expect(admin.getByText('A transaction with this reference number is already recorded for this account')).toBeVisible();
+
+  // Postponing Vendor B needs a reason; holding Marketing needs a reason and takes it out of the forecast
+  await admin.goto(vendorB);
+  await admin.getByLabel('New due date').fill(isoIn(20));
+  await admin.getByRole('button', { name: 'Change date' }).click();
+  await expect(admin.getByText('Give a reason for postponing')).toBeVisible();
+  await admin.getByRole('textbox', { name: 'Reason', exact: true }).fill('Agreed with vendor');
+  await admin.getByRole('button', { name: 'Change date' }).click();
+  await expect(admin.getByText('Date changed. The forecast is updated.')).toBeVisible();
+  await admin.reload();
+  await expect(admin.locator('main span.rounded-full').getByText('Postponed', { exact: true })).toBeVisible();
+  await expect(admin.getByText(/Postponed · .* · reason: Agreed with vendor · Kartik/)).toBeVisible();
+  await admin.goto(marketing);
+  await admin.getByRole('button', { name: 'Put on hold' }).click();
+  await admin.getByRole('dialog').getByLabel('Reason').fill('Campaign paused');
+  await admin.getByRole('dialog').getByRole('button', { name: 'Put on hold' }).click();
+  await expect(admin.getByText(/On hold: Campaign paused/)).toBeVisible();
+  await expect(admin.getByText('Put on hold · reason: Campaign paused')).toBeVisible();
+
+  // Forecast: ₹14L after the part payment; ₹3L + ₹1.5L out in 30 days; Vendor B now after 20 days
+  await admin.goto('/finance/forecast?days=30');
+  await expect(admin.getByText('In 30 days').locator('..')).toContainText('₹7,50,000');
+  await admin.goto('/finance/forecast?days=15');
+  await expect(admin.getByText('In 15 days').locator('..')).toContainText('₹9,50,000');
+  await admin.waitForLoadState('networkidle');
+  await admin.screenshot({ path: `${SHOTS}/41-cashflow-forecast.png`, fullPage: true });
+  await admin.goto('/finance/payables?status=all');
+  await admin.screenshot({ path: `${SHOTS}/42-cashflow-payables.png`, fullPage: true });
+
+  // The Super Admin gives Zinia Finance access from her Team page; she can then open Cash Flow
+  await admin.goto('/team');
+  await admin.getByRole('link', { name: 'Zinia', exact: true }).click();
+  await admin.getByLabel('Zinia can open Cash Flow').check();
+  await admin.getByRole('button', { name: 'Save Finance access' }).click();
+  await expect(admin.getByText('Finance access given. They can now open Cash Flow.')).toBeVisible();
+  await zinia.goto('/');
+  await zinia.locator('aside').getByRole('link', { name: 'Cash Flow' }).click();
+  await expect(zinia.getByRole('heading', { name: 'Cash Flow' })).toBeVisible();
+  await expect(zinia.getByText('Cash available now').locator('..')).toContainText('₹14,00,000');
+  // Her changes carry her name in the history
+  await zinia.goto(vendorA);
+  await zinia.getByLabel('New due date').fill(isoIn(1));
+  await zinia.getByRole('button', { name: 'Change date' }).click();
+  await expect(zinia.getByText('Date changed. The forecast is updated.')).toBeVisible();
+  await zinia.reload();
+  await expect(zinia.getByText(/Date changed · .* · Zinia/)).toBeVisible();
+  const phone = await as(browser, PEOPLE.Zinia, true);
+  await phone.goto('/finance');
+  await expect(phone.getByRole('heading', { name: 'Cash Flow' })).toBeVisible();
+  await phone.waitForLoadState('networkidle');
+  await phone.screenshot({ path: `${SHOTS}/43-cashflow-phone.png`, fullPage: true });
+
+  // Removing access takes Cash Flow away again
+  await admin.getByLabel('Zinia can open Cash Flow').uncheck();
+  await admin.getByRole('button', { name: 'Save Finance access' }).click();
+  await expect(admin.getByText('Finance access removed.')).toBeVisible();
+  await zinia.goto('/finance');
+  await expect(zinia).toHaveURL(/error=finance-only/);
+});

@@ -1,4 +1,4 @@
-import { requireMe } from '@/lib/session';
+import { getFinanceAccess, requireMe } from '@/lib/session';
 import { getBrand, sidebarBrand } from '@/lib/brand';
 import { Sidebar } from '@/components/sidebar';
 import { AutoRefresh } from '@/components/auto-refresh';
@@ -7,6 +7,7 @@ import { signOutAction } from '../auth-actions';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [me, brand] = await Promise.all([requireMe(), getBrand()]);
+  const canFinance = await getFinanceAccess(me.role);
   return (
     <div className="min-h-dvh">
       <Sidebar
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         role={ROLE_LABELS[me.role]}
         isManager={me.isManager}
         canSettings={me.areas.attendance || me.areas.settings}
+        canFinance={canFinance}
         signOut={signOutAction}
         brand={sidebarBrand(brand)}
       />

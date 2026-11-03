@@ -107,6 +107,7 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
     <>
       {sp.error === 'managers-only' && <Notice tone="warn">That page is for managers.</Notice>}
       {sp.error === 'admins-only' && <Notice tone="warn">That page is for admins.</Notice>}
+      {sp.error === 'finance-only' && <Notice tone="warn">Cash Flow is for the Super Admin and people with Finance access.</Notice>}
       <PageHeader
         title={`Hello, ${me.name}`}
         subtitle="Your work at a glance. Update status, % complete and a one-line note on anything you worked on today."

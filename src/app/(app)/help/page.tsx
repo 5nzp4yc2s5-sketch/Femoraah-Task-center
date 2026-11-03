@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireMe } from '@/lib/session';
+import { getFinanceAccess, requireMe } from '@/lib/session';
 import { PageHeader } from '@/components/ui';
 
 export const metadata = { title: 'How It Works' };
@@ -14,7 +14,8 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 export default async function Help() {
-  await requireMe();
+  const me = await requireMe();
+  const canFinance = await getFinanceAccess(me.role);
   return (
     <div className="max-w-3xl space-y-5">
       <PageHeader title="How It Works" subtitle="Team Task Command Center" />
@@ -139,6 +140,17 @@ export default async function Help() {
         <p className="mt-2">A Credentials admin adds logins and shares them with people or teams. An <strong>access manager</strong> can also save a new password and share the login. Saving a password here only updates the copy kept in the app: change it on the website first. Every show, copy, change and share is recorded in the login&apos;s history, and access ends automatically when someone&apos;s role changes or their account is deactivated.</p>
       </Card>
 
+      {canFinance && (
+        <Card title="Cash Flow (Super Admin and Finance access only)">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>Only the Super Admin and people the Super Admin gives <strong>Finance access</strong> on their Team page can open <Link href="/finance" className="text-navy-700 underline">Cash Flow</Link>, whatever their role. Every change is recorded with who made it.</li>
+            <li><strong>Banks</strong>: each account&apos;s balance is the latest balance you recorded plus the transactions after it. Only the last 4 digits of an account number are kept. Never enter passwords or OTPs.</li>
+            <li><strong>Payments due</strong> and <strong>Money coming in</strong>: nothing is paid, moved or marked received automatically. You record each payment or receipt, in full or in part, and it adds the bank transaction. Moving a payment later, putting it on hold or cancelling it needs a reason.</li>
+            <li><strong>Loans &amp; EMIs</strong>: each loan&apos;s EMIs are planned 90 days ahead, once each, as critical payments.</li>
+            <li><strong>Forecast</strong>: the balance day by day for 7 to 90 days from what is on record. Payments on hold, and money that is late or disputed, are left out until you give them a date.</li>
+          </ul>
+        </Card>
+      )}
       <Card title="Signing in">
         <p>Sign in with your username and 3-digit PIN. Your device stays signed in and asks for the PIN again every 12 hours. Five wrong PINs in a row lock the account until the admin resets your PIN from the Team page. Change your PIN from <Link href="/account" className="text-navy-700 underline">Account</Link>, and never share it in a group chat.</p>
       </Card>

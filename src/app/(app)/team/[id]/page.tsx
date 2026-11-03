@@ -7,7 +7,7 @@ import { ADMIN_AREAS, LIVE_ADMIN_AREAS, type TeamRow } from '@/lib/types';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { Notice, SectionTitle, StatCard } from '@/components/ui';
 import { Avatar, CapacityBadge } from '@/components/badges';
-import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, setAreasAction, updateMemberAction } from '../actions';
+import { createLoginAction, removeLoginAction, resetPinAction, setActiveAction, setAreasAction, setFinanceAccessAction, updateMemberAction } from '../actions';
 import { LoginFields, MemberFields } from '../fields';
 
 export const metadata = { title: 'Team member' };
@@ -18,10 +18,11 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const me = await requireAdmin();
   const supabase = await createClient();
-  const [{ data: team, error }, { data: raw }, { data: grants }] = await Promise.all([
+  const [{ data: team, error }, { data: raw }, { data: grants }, { data: finance }] = await Promise.all([
     supabase.rpc('team_overview'),
     supabase.from('members').select('accepts_unmatched').eq('id', id).maybeSingle(),
     supabase.from('admin_area_grants').select('area, granted_at').eq('member_id', id).is('revoked_at', null),
+    supabase.from('finance_access').select('granted_at').eq('member_id', id).is('revoked_at', null).maybeSingle(),
   ]);
   const granted = new Set((grants ?? []).map((g) => g.area as string));
   if (error) {
@@ -95,6 +96,28 @@ export default async function MemberPage({ params, searchParams }: { params: Pro
               ))}
             </fieldset>
             <div className="flex justify-end"><SubmitButton>Save admin areas</SubmitButton></div>
+          </ActionForm>
+        </section>
+      )}
+
+      {m.access_role !== 'admin' && m.is_active && (
+        <section className="card p-5">
+          <SectionTitle>Finance access</SectionTitle>
+          <p className="mb-3 text-sm text-slate-600">
+            Cash Flow shows bank balances, payments, receivables and loans. Only you and the people you choose here can open it, whatever their role.
+          </p>
+          <ActionForm action={setFinanceAccessAction} className="space-y-3">
+            <input type="hidden" name="id" value={m.member_id} />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="finance" defaultChecked={Boolean(finance)} className="mt-0.5" />
+              <span>
+                <span className="font-medium text-navy-900">{m.name} can open Cash Flow</span>
+                <span className="block text-xs text-slate-500">
+                  {finance ? `Given ${fmtDate(String(finance.granted_at).slice(0, 10))}. ` : ''}They can see and change every finance record. Every change is recorded with their name.
+                </span>
+              </span>
+            </label>
+            <div className="flex justify-end"><SubmitButton>Save Finance access</SubmitButton></div>
           </ActionForm>
         </section>
       )}
