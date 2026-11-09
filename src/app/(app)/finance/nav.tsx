@@ -11,6 +11,7 @@ const TABS = [
   { href: '/finance/loans', label: 'Loans & EMIs' },
   { href: '/finance/transactions', label: 'Transactions' },
   { href: '/finance/accounts', label: 'Banks' },
+  { href: '/finance/gmail', label: 'Bank emails' },
 ];
 
 export function FinanceNav() {

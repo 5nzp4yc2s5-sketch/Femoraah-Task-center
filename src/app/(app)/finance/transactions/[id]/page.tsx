@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { confirmTxnsAction } from '../../gmail/actions';
 import { notFound } from 'next/navigation';
 import { requireFinance } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
@@ -48,7 +49,15 @@ export default async function TxnPage({ params }: { params: Promise<{ id: string
       <BackLink href="/finance/transactions">Transactions</BackLink>
       <PageHeader title={t.counterparty || t.description || 'Transaction'} subtitle={`${t.direction === 'in' ? 'Money in' : 'Money out'} · ${fmtDate(when.date)} ${when.time}`} />
       {t.voided_at && <Notice tone="warn">This transaction was undone{t.void_reason ? `: ${t.void_reason}` : ''}. It no longer counts in balances.</Notice>}
-      {t.review_status === 'needs_review' && !t.voided_at && <Notice tone="warn">This was read from a bank email and needs checking. Edit and save it to confirm.</Notice>}
+      {t.review_status === 'needs_review' && !t.voided_at && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <span>This was read from a bank email and needs checking. Confirm it if it is right, or edit it (saving confirms it). Until then it does not count towards the balance.</span>
+          <ActionForm action={confirmTxnsAction}>
+            <input type="hidden" name="ids" value={t.id} />
+            <SubmitButton className="btn-secondary" pendingText="Confirming…">Confirm</SubmitButton>
+          </ActionForm>
+        </div>
+      )}
 
       <dl className="card p-4">
         <Fact label="Amount"><Money paise={t.direction === 'in' ? t.amount_paise : -t.amount_paise} signed plain className={t.direction === 'in' ? 'text-lg text-green-700' : 'text-lg'} /></Fact>

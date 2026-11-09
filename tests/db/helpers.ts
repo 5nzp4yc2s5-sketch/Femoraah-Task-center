@@ -56,6 +56,7 @@ export async function login(name: string): Promise<SupabaseClient> {
 
 export async function resetData(): Promise<void> {
   await db.query(`
+    delete from public.fin_gmail_alerts; delete from public.fin_gmail_connections;
     delete from public.fin_events; delete from public.fin_transactions; delete from public.fin_payables; delete from public.fin_receivables;
     delete from public.fin_loans; delete from public.fin_balances; delete from public.fin_accounts; delete from public.finance_access;
     update public.fin_settings set min_cash_paise = 0, large_debit_paise = 0;

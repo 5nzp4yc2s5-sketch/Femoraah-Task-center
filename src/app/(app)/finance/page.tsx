@@ -6,9 +6,11 @@ import { cashAlerts, inr, localParts, plusDays, todayIn, zonedIso } from '@/lib/
 import { EmptyState, Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { loadPlan, loadTxns } from './data';
 import { CashChart } from './cash-chart';
+import { checkStaleSoon } from '@/lib/gmail-sync';
 import { Money, PriorityTag, accountKind, accountName } from './parts';
 
 export const metadata = { title: 'Cash Flow' };
+export const maxDuration = 60;
 
 function Stat({ label, value, hint, tone = 'default', href }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: 'default' | 'green' | 'amber' | 'red'; href?: string }) {
   const color = { default: 'text-navy-900', green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700' }[tone];
@@ -29,7 +31,14 @@ export default async function FinanceHome() {
   const today = todayIn(tz);
   const monthStart = `${today.slice(0, 8)}01`;
   const since = [monthStart, plusDays(today, -7)].sort()[0];
-  const [plan, recent] = await Promise.all([loadPlan(supabase, today, 30), loadTxns(supabase, { since: zonedIso(since, '00:00', tz) })]);
+  const [plan, recent, toCheck, openAlerts, mailboxes] = await Promise.all([
+    loadPlan(supabase, today, 30),
+    loadTxns(supabase, { since: zonedIso(since, '00:00', tz) }),
+    supabase.from('fin_transactions').select('id', { count: 'exact', head: true }).eq('review_status', 'needs_review').is('voided_at', null),
+    supabase.from('fin_gmail_alerts').select('id', { count: 'exact', head: true }).in('status', ['no_account', 'unreadable']),
+    supabase.from('fin_gmail_connections').select('email, last_sync_ok, last_sync_message').is('disconnected_at', null),
+  ]);
+  if (mailboxes.data?.length) checkStaleSoon(me.memberId);
   const { settings, accounts, balances, available, payables, receivables, flows, projection } = plan;
 
   if (accounts.length === 0) {
@@ -61,6 +70,15 @@ export default async function FinanceHome() {
   const freeCash = available - out30;
 
   const alerts = cashAlerts({ today, available, settings, payables, receivables, recentTxns: recent.filter((t) => dayOf(t.txn_at) >= plusDays(today, -7)), forecast30: projection, fmtDate, dayOf });
+  for (const m of mailboxes.data ?? []) {
+    if (m.last_sync_ok === false) alerts.push({ key: `gmail-${m.email}`, tone: 'red', title: 'Bank emails are not being read', detail: `${m.email}: ${m.last_sync_message || 'the last check failed'}`, href: '/finance/gmail' });
+  }
+  if (toCheck.count) {
+    alerts.push({ key: 'review', tone: 'amber', title: 'Transactions from bank emails to check', detail: `${toCheck.count} not confirmed yet, so they are not in the balance.`, href: '/finance/transactions?review=1' });
+  }
+  if (openAlerts.count) {
+    alerts.push({ key: 'gmail-open', tone: 'amber', title: 'Bank emails to sort out', detail: `${openAlerts.count} need${openAlerts.count === 1 ? 's' : ''} an account chosen or could not be read.`, href: '/finance/gmail' });
+  }
   const health =
     projection.firstNegative || available < 0 || (settings.min_cash_paise > 0 && available < settings.min_cash_paise)
       ? { tone: 'red' as const, label: 'Action needed', text: projection.firstNegative ? `On what is planned, cash goes below zero on ${fmtDate(projection.firstNegative)}.` : 'Cash is under your minimum today.' }

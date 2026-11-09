@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/server';
 import { fmtDate, isIsoDate } from '@/lib/format';
 import { IN_CATEGORIES, OUT_CATEGORIES, TRANSFER, inr, localParts, plusDays, todayIn, zonedIso } from '@/lib/finance';
 import { EmptyState, Notice, PageHeader } from '@/components/ui';
+import { ActionForm, SubmitButton } from '@/components/forms';
+import { confirmTxnsAction } from '../gmail/actions';
 import { loadAccounts, loadTxns } from '../data';
 import { Money, accountName, categoryName } from '../parts';
 
 export const metadata = { title: 'Transactions' };
 
-type SP = { account?: string; direction?: string; category?: string; from?: string; to?: string; q?: string; voided?: string; added?: string };
+type SP = { account?: string; direction?: string; category?: string; from?: string; to?: string; q?: string; voided?: string; added?: string; review?: string };
 const UUID = /^[0-9a-f-]{36}$/i;
 const CATS = new Set([...OUT_CATEGORIES, ...IN_CATEGORIES, TRANSFER].map((c) => c.key as string));
 
@@ -19,7 +21,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const tz = me.timezone;
   const supabase = await createClient();
   const today = todayIn(tz);
-  const from = isIsoDate(sp.from) ? sp.from : plusDays(today, -30);
+  const review = sp.review === '1';
+  const from = isIsoDate(sp.from) ? sp.from : plusDays(today, review ? -90 : -30);
   const to = isIsoDate(sp.to) ? sp.to : today;
   const account = sp.account && UUID.test(sp.account) ? sp.account : '';
   const direction = sp.direction === 'in' || sp.direction === 'out' ? sp.direction : '';
@@ -33,6 +36,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   ]);
   const byId = new Map(accounts.map((a) => [a.id, a]));
   const rows = all.filter((t) => {
+    if (review && t.review_status !== 'needs_review') return false;
     if (direction && t.direction !== direction) return false;
     if (category && t.category !== category) return false;
     if (!term) return true;
@@ -41,7 +45,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const live = rows.filter((t) => !t.voided_at && t.category !== 'transfer');
   const totalIn = live.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount_paise, 0);
   const totalOut = live.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount_paise, 0);
-  const hasFilters = Boolean(account || direction || category || term || showVoided || sp.from || sp.to);
+  const hasFilters = Boolean(account || direction || category || term || showVoided || review || sp.from || sp.to);
+  const toCheck = rows.filter((t) => t.review_status === 'needs_review' && !t.voided_at);
   const at = (iso: string) => {
     const p = localParts(iso, tz);
     return { date: fmtDate(p.date), time: p.time };
@@ -77,6 +82,9 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <label className="flex items-center gap-1.5 text-sm text-slate-700">
             <input type="checkbox" name="voided" value="1" defaultChecked={showVoided} /> Show undone ones
           </label>
+          <label className="flex items-center gap-1.5 text-sm text-slate-700">
+            <input type="checkbox" name="review" value="1" defaultChecked={review} /> Only ones to check
+          </label>
           <div className="ml-auto flex gap-2">
             {hasFilters && <Link href="/finance/transactions" className="btn-ghost">Clear</Link>}
             <button className="btn-secondary" type="submit">Apply</button>
@@ -87,6 +95,18 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       <p className="mb-2 text-xs text-slate-500">
         {rows.length} transaction{rows.length === 1 ? '' : 's'} from {fmtDate(from)} to {fmtDate(to)} · in <span className="text-green-700">{inr(totalIn)}</span> · out {inr(totalOut)} (transfers not counted)
       </p>
+
+      {toCheck.length > 0 && (
+        <div className="card mb-3 flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm text-amber-900">
+            {toCheck.length} read from bank emails and not checked yet (shaded). They count towards balances once confirmed. Open one to fix its category or details first.
+          </p>
+          <ActionForm action={confirmTxnsAction}>
+            <input type="hidden" name="ids" value={toCheck.map((t) => t.id).join(',')} />
+            <SubmitButton className="btn-secondary" pendingText="Confirming…">Confirm {toCheck.length === 1 ? 'it' : `all ${toCheck.length}`}</SubmitButton>
+          </ActionForm>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState title="No transactions here" body={hasFilters ? 'Try another account, category or dates.' : 'Add transactions from your bank, or record payments and receipts and they appear here.'} />
