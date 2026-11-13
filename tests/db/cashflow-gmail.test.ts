@@ -263,7 +263,7 @@ describe('debit cards and reading again (13-Nov-2026)', () => {
     expect((await k.rpc('fin_account_link_card', { p_account: other, p_last4: '12345' })).error).not.toBeNull();
   });
 
-  it('reads again: fills in missing details, works out unused alerts afresh, and leaves handled ones alone', async () => {
+  it('reads again: fills in missing details, works out unused alerts afresh, flags changes and leaves handled ones alone', async () => {
     const k = await login('Kartik');
     const acc = await account(k, '1234');
     const conn = await connect(k);
@@ -271,7 +271,8 @@ describe('debit cards and reading again (13-Nov-2026)', () => {
     const confirmed = alert({ reference_no: '', counterparty: '' });
     const unread = alert({ readable: false, direction: null, amount_paise: null, last4: '', reference_no: '', counterparty: '' });
     const setAside = alert({ readable: false, direction: null, amount_paise: null, last4: '', reference_no: '', counterparty: '' });
-    await record(conn, [recorded, confirmed, unread, setAside]);
+    const changed = alert({ reference_no: '', counterparty: '' });
+    await record(conn, [recorded, confirmed, unread, setAside, changed]);
     const txn = async (m: string) => (await sql<{ transaction_id: string }>('select transaction_id from public.fin_gmail_alerts where message_id = $1', [m]))[0].transaction_id;
     const confirmedTxn = await txn(confirmed.message_id);
     expect((await k.rpc('fin_txn_confirm', { p_ids: [confirmedTxn] })).error).toBeNull();
@@ -288,15 +289,24 @@ describe('debit cards and reading again (13-Nov-2026)', () => {
         better(confirmed, { reference_no: 'UTR0000000002', counterparty: 'ACME RETAIL' }),
         better(unread, { readable: true, direction: 'in', amount_paise: L(970), last4: '1234', counterparty: 'TRAVEL SITE' }),
         better(setAside, { readable: true, direction: 'in', amount_paise: L(500), last4: '1234' }),
+        better(changed, { amount_paise: L(1), reference_no: 'UTR0000000003' }),
       ],
     });
     expect(error).toBeNull();
-    expect(data).toMatchObject({ read: 4, filled_in: 1, recorded: 1, unchanged: 2 });
+    expect(data).toMatchObject({ read: 5, filled_in: 2, recorded: 1, differs: 1, unchanged: 1 });
 
     const t = (await sql<{ reference_no: string; counterparty: string }>('select reference_no, counterparty from public.fin_transactions where id = $1', [await txn(recorded.message_id)]))[0];
     expect(t).toEqual({ reference_no: 'UTR0000000001', counterparty: 'ACME RETAIL' });
-    // A confirmed transaction is never changed.
-    expect((await sql<{ reference_no: string }>('select reference_no from public.fin_transactions where id = $1', [confirmedTxn]))[0].reference_no).toBe('');
+    // A confirmed transaction gets only its blank reference and payee filled in, and the history says so.
+    const c = (await sql<{ reference_no: string; counterparty: string; review_status: string }>('select reference_no, counterparty, review_status from public.fin_transactions where id = $1', [confirmedTxn]))[0];
+    expect(c).toEqual({ reference_no: 'UTR0000000002', counterparty: 'ACME RETAIL', review_status: 'confirmed' });
+    const hist = await sql<{ actor_member_id: string; details: Record<string, unknown> }>(`select actor_member_id, details from public.fin_events where entity_id = $1 and action = 'details_filled'`, [confirmedTxn]);
+    expect(hist).toHaveLength(1);
+    expect(hist[0]).toMatchObject({ actor_member_id: ids.Kartik, details: { by: 'read_again', reference_no: { before: '', after: 'UTR0000000002' } } });
+    // An email that now reads differently leaves its transaction as it was and says so on the alert.
+    const ch = (await sql<{ amount_paise: string; reference_no: string; note: string }>('select t.amount_paise, t.reference_no, a.note from public.fin_gmail_alerts a join public.fin_transactions t on t.id = a.transaction_id where a.message_id = $1', [changed.message_id]))[0];
+    expect(ch).toMatchObject({ reference_no: '', note: 'Read again: this email says money out of ₹1.00. Check the transaction' });
+    expect(Number(ch.amount_paise)).toBe(changed.amount_paise);
     // The unused alert is now a transaction waiting to be checked; the set-aside one stays set aside.
     const now = await sql<{ message_id: string; status: string }>('select message_id, status from public.fin_gmail_alerts where message_id = any($1) order by message_id', [[unread.message_id, setAside.message_id]]);
     expect(now.map((r) => r.status)).toEqual(['recorded', 'ignored']);
@@ -307,6 +317,6 @@ describe('debit cards and reading again (13-Nov-2026)', () => {
       p_connection: conn, p_actor: ids.Kartik, p_alerts: [better(recorded, { reference_no: 'UTR0000000001', counterparty: 'ACME RETAIL' })],
     });
     expect(again.data).toMatchObject({ read: 1, filled_in: 0, unchanged: 1 });
-    expect((await sql('select 1 from public.fin_transactions')).length).toBe(3);
+    expect((await sql('select 1 from public.fin_transactions')).length).toBe(4);
   });
 });

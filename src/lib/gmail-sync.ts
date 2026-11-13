@@ -164,6 +164,7 @@ export async function rereadMailbox(connectionId: string, actor: string): Promis
       n.balance_only && `${n.balance_only} balance update${n.balance_only === 1 ? '' : 's'}`,
       n.no_account && `${n.no_account} still need${n.no_account === 1 ? 's' : ''} an account chosen`,
       n.unreadable && `${n.unreadable} not used`,
+      n.differs && `${n.differs} now read${n.differs === 1 ? 's' : ''} differently from ${n.differs === 1 ? 'its transaction' : 'their transactions'}, see the note below`,
     ].filter(Boolean);
     return { ok: true, message: `Read ${n.read} email${n.read === 1 ? '' : 's'} again${parts.length ? `: ${parts.join(', ')}` : '. Nothing changed'}.` };
   } catch (e) {

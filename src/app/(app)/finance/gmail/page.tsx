@@ -259,6 +259,7 @@ export default async function BankEmailsPage({ searchParams }: { searchParams: P
                         <div className="truncate">{a.counterparty || a.subject || 'Bank email'}</div>
                         {a.balance_paise != null && <div className="text-xs text-slate-500">Balance {inr(a.balance_paise)}</div>}
                         {notice(a) && <div className="text-xs text-slate-500">{a.note}</div>}
+                        {!notice(a) && a.transaction_id && a.note && <div className="text-xs text-amber-700">{a.note}</div>}
                       </td>
                       <td className="whitespace-nowrap text-sm">{a.account_id ? accountName(byId.get(a.account_id)) : a.last4 ? `ending ${a.last4}` : '—'}</td>
                       <td className="font-mono text-xs">{a.reference_no}</td>
