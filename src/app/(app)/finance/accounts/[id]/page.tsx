@@ -8,7 +8,7 @@ import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { memberNames } from '../../../attendance/data';
 import { loadAccounts, loadEvents, loadReadings, loadTxns } from '../../data';
-import { archiveAccountAction, recordBalanceAction, saveAccountAction } from '../../actions';
+import { archiveAccountAction, linkCardAction, recordBalanceAction, saveAccountAction } from '../../actions';
 import { AccountFields } from '../../fields';
 import { BackLink, Fact, Field, History, Money, RupeeInput, accountKind, accountName, categoryName } from '../../parts';
 
@@ -50,6 +50,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
           <Fact label="Balance now"><Money paise={bal.balance} className="text-lg" /></Fact>
           <Fact label="Last balance recorded">{bal.reading ? <><Money paise={bal.reading.balance_paise} /> on {at(bal.reading.as_of)}</> : '—'}</Fact>
           <Fact label="Transactions since">{bal.movedSince}</Fact>
+          {account.card_last4 && <Fact label="Debit card">ending {account.card_last4}</Fact>}
           {account.notes && <Fact label="Notes"><span className="whitespace-pre-line font-normal">{account.notes}</span></Fact>}
         </dl>
 
@@ -114,6 +115,20 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
           </tbody>
         </table>
       </div>
+
+      {!account.archived_at && (
+        <details className="mt-6">
+          <summary className="cursor-pointer text-sm font-semibold text-navy-800">Debit card on this account</summary>
+          <ActionForm action={linkCardAction} className="card mt-2 max-w-xl space-y-3 p-4">
+            <p className="text-xs text-slate-600">HDFC&apos;s debit card alerts name only the card. With its last 4 digits here, those alerts land in this account. Leave it empty to remove the card.</p>
+            <input type="hidden" name="account" value={id} />
+            <Field label="Last 4 digits of the debit card" htmlFor="card-last4">
+              <input id="card-last4" name="card_last4" className="input w-32 tabular-nums" inputMode="numeric" pattern="\d{4}" maxLength={4} defaultValue={account.card_last4} placeholder="5678" />
+            </Field>
+            <div className="flex justify-end"><SubmitButton>Save card</SubmitButton></div>
+          </ActionForm>
+        </details>
+      )}
 
       {!account.archived_at && (
         <details className="mt-6">

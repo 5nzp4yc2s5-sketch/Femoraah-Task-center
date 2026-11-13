@@ -79,7 +79,7 @@ describe('statuses', () => {
 
 describe('balances', () => {
   it('start from the latest reading and add confirmed transactions after it', () => {
-    const acc: FinAccount = { id: 'a', name: 'HDFC', bank: '', last4: '1234', kind: 'current', notes: '', archived_at: null };
+    const acc: FinAccount = { id: 'a', name: 'HDFC', bank: '', last4: '1234', card_last4: '', kind: 'current', notes: '', archived_at: null };
     const t = (id: string, at: string, dir: 'in' | 'out', amt: number, extra: Partial<FinTxn> = {}): FinTxn => ({
       id, account_id: 'a', txn_at: at, direction: dir, amount_paise: amt, category: 'vendor', counterparty: '', description: '', reference_no: '',
       source: 'manual', review_status: 'confirmed', payable_id: null, receivable_id: null, voided_at: null, void_reason: '', created_at: at, ...extra,

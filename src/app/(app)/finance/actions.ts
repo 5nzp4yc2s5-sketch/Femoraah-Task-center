@@ -104,6 +104,20 @@ export async function archiveAccountAction(_prev: ActionState, formData: FormDat
   return { ok: archived ? 'Account removed from use. Its history is kept.' : 'Account back in use.' };
 }
 
+export async function linkCardAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireFinance();
+  const id = UUID.safeParse(formData.get('account'));
+  if (!id.success) return { error: 'Bank account not found' };
+  const last4 = String(formData.get('card_last4') ?? '').trim();
+  if (!/^(\d{4})?$/.test(last4)) return { error: 'Enter only the last 4 digits of the card, or leave it empty' };
+  const r = await rpc('fin_account_link_card', { p_account: id.data, p_last4: last4 });
+  if (r.error) return { error: r.error };
+  done(['/finance']);
+  const n = Number(r.data ?? 0);
+  if (!last4) return { ok: 'Card removed from this account.' };
+  return { ok: n ? `Saved. ${n} bank email${n === 1 ? '' : 's'} for this card recorded; check them under Transactions.` : 'Saved. Alerts for this card now land in this account.' };
+}
+
 export async function recordBalanceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const me = await requireFinance();
   const parsed = z

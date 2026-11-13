@@ -187,8 +187,8 @@ describe('recording alerts', () => {
     const notes = (await sql<{ status: string; note: string }>('select status, note from public.fin_gmail_alerts order by received_at')).map((r) => `${r.status}: ${r.note}`);
     expect(notes).toEqual([
       'duplicate: Already recorded on this account with the same reference number',
-      'no_account: No bank account in use ends in 5555. Add it under Banks, or choose one',
-      'no_account: More than one bank account ends in 9999. Choose one',
+      'no_account: No bank account or debit card in use ends in 5555. Choose the account it belongs to',
+      'no_account: More than one bank account or card ends in 9999. Choose one',
       'no_account: The email does not say which account. Choose one',
     ]);
     // A duplicate's balance is not taken either.
@@ -229,5 +229,84 @@ describe('recording alerts', () => {
     await k.rpc('fin_gmail_disconnect', { p_id: id });
     const { error } = await admin.rpc('fin_gmail_record', { p_connection: id, p_actor: null, p_alerts: [alert()], p_seen_until: null, p_ok: true, p_message: '' });
     expect(error?.message).toMatch(/no longer connected|not found/);
+  });
+});
+
+describe('debit cards and reading again (13-Nov-2026)', () => {
+  it('records card alerts in the account the card is linked to, now and later', async () => {
+    const k = await login('Kartik');
+    const acc = await account(k, '1234');
+    const conn = await connect(k);
+    const before = await record(conn, [
+      alert({ last4: '5678', reference_no: '', counterparty: 'SHOP ONE' }),
+      alert({ last4: '5678', reference_no: '', counterparty: 'SHOP TWO', amount_paise: L(900) }),
+    ]);
+    expect(before.no_account).toBe(2);
+    const notes = await sql<{ note: string }>('select note from public.fin_gmail_alerts order by received_at');
+    expect(notes[0].note).toContain('debit card');
+
+    // A Finance user links the card: both waiting alerts are recorded at once.
+    const { data: n, error } = await k.rpc('fin_account_link_card', { p_account: acc, p_last4: '5678' });
+    expect(error).toBeNull();
+    expect(n).toBe(2);
+    expect((await sql(`select 1 from public.fin_transactions where account_id = $1 and source = 'gmail' and review_status = 'needs_review'`, [acc])).length).toBe(2);
+    expect((await sql(`select 1 from public.fin_events where action = 'card_linked'`)).length).toBe(1);
+
+    // Later card alerts go straight in.
+    const later = await record(conn, [alert({ last4: '5678', reference_no: '' })]);
+    expect(later.recorded).toBe(1);
+
+    // The card digits cannot belong to two accounts.
+    const other = await account(k, '4321');
+    const clash = await k.rpc('fin_account_link_card', { p_account: other, p_last4: '5678' });
+    expect(clash.error?.message).toContain('already ends in 5678');
+    expect((await k.rpc('fin_account_link_card', { p_account: other, p_last4: '12345' })).error).not.toBeNull();
+  });
+
+  it('reads again: fills in missing details, works out unused alerts afresh, and leaves handled ones alone', async () => {
+    const k = await login('Kartik');
+    const acc = await account(k, '1234');
+    const conn = await connect(k);
+    const recorded = alert({ reference_no: '', counterparty: '' });
+    const confirmed = alert({ reference_no: '', counterparty: '' });
+    const unread = alert({ readable: false, direction: null, amount_paise: null, last4: '', reference_no: '', counterparty: '' });
+    const setAside = alert({ readable: false, direction: null, amount_paise: null, last4: '', reference_no: '', counterparty: '' });
+    await record(conn, [recorded, confirmed, unread, setAside]);
+    const txn = async (m: string) => (await sql<{ transaction_id: string }>('select transaction_id from public.fin_gmail_alerts where message_id = $1', [m]))[0].transaction_id;
+    const confirmedTxn = await txn(confirmed.message_id);
+    expect((await k.rpc('fin_txn_confirm', { p_ids: [confirmedTxn] })).error).toBeNull();
+    const aside = (await sql<{ id: string }>('select id from public.fin_gmail_alerts where message_id = $1', [setAside.message_id]))[0].id;
+    expect((await k.rpc('fin_gmail_alert_ignore', { p_alert: aside, p_reason: 'Not needed' })).error).toBeNull();
+
+    // Nobody signed in can call it; only the server can.
+    expect((await k.rpc('fin_gmail_reread', { p_connection: conn, p_actor: ids.Kartik, p_alerts: [] })).error).not.toBeNull();
+
+    const better = (a: Record<string, unknown>, over: Record<string, unknown>) => ({ ...a, ...over });
+    const { data, error } = await admin.rpc('fin_gmail_reread', {
+      p_connection: conn, p_actor: ids.Kartik, p_alerts: [
+        better(recorded, { reference_no: 'UTR0000000001', counterparty: 'ACME RETAIL' }),
+        better(confirmed, { reference_no: 'UTR0000000002', counterparty: 'ACME RETAIL' }),
+        better(unread, { readable: true, direction: 'in', amount_paise: L(970), last4: '1234', counterparty: 'TRAVEL SITE' }),
+        better(setAside, { readable: true, direction: 'in', amount_paise: L(500), last4: '1234' }),
+      ],
+    });
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ read: 4, filled_in: 1, recorded: 1, unchanged: 2 });
+
+    const t = (await sql<{ reference_no: string; counterparty: string }>('select reference_no, counterparty from public.fin_transactions where id = $1', [await txn(recorded.message_id)]))[0];
+    expect(t).toEqual({ reference_no: 'UTR0000000001', counterparty: 'ACME RETAIL' });
+    // A confirmed transaction is never changed.
+    expect((await sql<{ reference_no: string }>('select reference_no from public.fin_transactions where id = $1', [confirmedTxn]))[0].reference_no).toBe('');
+    // The unused alert is now a transaction waiting to be checked; the set-aside one stays set aside.
+    const now = await sql<{ message_id: string; status: string }>('select message_id, status from public.fin_gmail_alerts where message_id = any($1) order by message_id', [[unread.message_id, setAside.message_id]]);
+    expect(now.map((r) => r.status)).toEqual(['recorded', 'ignored']);
+    expect((await sql(`select 1 from public.fin_transactions where account_id = $1 and direction = 'in' and amount_paise = $2`, [acc, L(970)])).length).toBe(1);
+
+    // Reading again a second time changes nothing more.
+    const again = await admin.rpc('fin_gmail_reread', {
+      p_connection: conn, p_actor: ids.Kartik, p_alerts: [better(recorded, { reference_no: 'UTR0000000001', counterparty: 'ACME RETAIL' })],
+    });
+    expect(again.data).toMatchObject({ read: 1, filled_in: 0, unchanged: 1 });
+    expect((await sql('select 1 from public.fin_transactions')).length).toBe(3);
   });
 });

@@ -70,6 +70,8 @@ export interface FinAccount {
   name: string;
   bank: string;
   last4: string;
+  /** Last 4 digits of the debit card on this account, so card alerts land here. */
+  card_last4: string;
   kind: AccountKind;
   notes: string;
   archived_at: string | null;

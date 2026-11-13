@@ -13,6 +13,8 @@ export interface ParsedAlert {
   reference_no: string;
   counterparty: string;
   balance_paise: number | null;
+  /** Why an email that mentions money was not used, when the reason is known. */
+  note?: string;
 }
 
 const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", rsquo: "'", lsquo: "'", ndash: '-', mdash: '-', rupee: '₹' };
@@ -51,7 +53,7 @@ const CUR = String.raw`(?:rs\.?|inr|₹)`;
 const NUM = String.raw`([0-9][0-9,]*(?:\.[0-9]{1,2})?)`;
 const MONEY = String.raw`${CUR}\s*(?:${CUR}\s*)?${NUM}`;
 
-const OUT_WORDS = String.raw`debited|spent|withdrawn|deducted|paid|sent|transferred`;
+const OUT_WORDS = String.raw`debited|spent|withdrawn|withdrawal|deducted|paid|sent|transferred`;
 const IN_WORDS = String.raw`credited|received|deposited|refunded|reversed`;
 
 function directionOf(word: string): 'in' | 'out' {
@@ -73,6 +75,18 @@ function findAmount(text: string): { direction: 'in' | 'out'; amount: number } |
     if (isBalance(text, moneyAt)) continue;
     const amount = toPaise(m[2]);
     if (amount && amount > 0) candidates.push({ index: m.index, direction: directionOf(m[1]), amount });
+  }
+  // HDFC: "You have successfully initiated RTGS transaction of Rs. 400000 from your HDFC Bank A/c XX1234".
+  const initiated = new RegExp(`\\binitiated\\s+(?:(?:rtgs|neft|imps)\\s+)?(?:transaction|transfer|payment)\\s+of\\s+${MONEY}`, 'gi');
+  for (const m of text.matchAll(initiated)) {
+    const amount = toPaise(m[1]);
+    if (amount && amount > 0) candidates.push({ index: m.index, direction: 'out', amount });
+  }
+  // HDFC: "a transaction for Rs 970.00, on your HDFC Bank Debit Card ending 1234 at SHOP on 26-10-2026 is reversed".
+  const reversed = new RegExp(`\\btransaction\\s+(?:of|for)\\s+${MONEY}[^!?\\n]{0,200}?\\bis\\s+reversed\\b`, 'gi');
+  for (const m of text.matchAll(reversed)) {
+    const amount = toPaise(m[1]);
+    if (amount && amount > 0) candidates.push({ index: m.index, direction: 'in', amount });
   }
   candidates.sort((a, b) => a.index - b.index);
   return candidates[0] ? { direction: candidates[0].direction, amount: candidates[0].amount } : null;
@@ -99,7 +113,20 @@ function findLast4(text: string): string {
   return named ? named[1] : '';
 }
 
+// HDFC deposit alerts: "Reference Details: NEFT Cr-IFSC0000001-PAYER NAME-OUR NAME-UTR123456 Available Balance: ...".
+function referenceDetails(text: string): string[] {
+  const m = text.match(/\breference\s+details\s*:\s*([^\n]{3,300}?)(?=\s+(?:available|avl|avbl)\b|\s+for\s+real-time\b|\s+thank\s+you\b|[\n|]|$)/i);
+  return m ? m[1].split('-').map((s) => s.trim()).filter(Boolean) : [];
+}
+
 function findReference(text: string): string {
+  // Only NEFT, RTGS and IMPS details end with the bank's unique number (UTR). Other kinds, such as
+  // "FT- CID...", repeat the same customer number on every payment, so they give no reference.
+  const details = referenceDetails(text);
+  const utr = details.length >= 3 ? details[details.length - 1] : '';
+  if (/^(?:neft|rtgs|imps)\b/i.test(details[0] ?? '') && /^[A-Za-z0-9]{8,30}$/.test(utr) && /\d/.test(utr) && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(utr)) {
+    return utr.toUpperCase();
+  }
   const patterns = [
     /\bupi\s*(?:transaction\s*)?(?:reference|ref)\.?\s*(?:number|no\.?|id)?\s*(?:is|:|-)?\s*([0-9]{8,20})\b/i,
     /\butr\s*(?:no\.?|number)?\s*(?:is|:|-)?\s*([A-Za-z0-9]{8,30})\b/i,
@@ -117,6 +144,13 @@ function clean(name: string): string {
 }
 
 function findCounterparty(text: string): string {
+  const payee = text.match(/\bto\s+payee\s+([A-Za-z0-9][A-Za-z0-9 .&'-]{0,60}?)\s+(?:via|using|through|by|on)\b/i);
+  if (payee) return clean(payee[1]);
+  // The payer's name in "NEFT Cr-IFSC0000001-PAYER NAME-OUR NAME-UTR": the first part made only of letters.
+  const named = referenceDetails(text).slice(1).find((s) => /^[A-Za-z][A-Za-z .&'()]{2,}$/.test(s));
+  if (named) return clean(named);
+  const card = text.match(/\bcard\b[^\n]{0,100}?\bat\s+([A-Za-z0-9][A-Za-z0-9 .&'*()-]{1,60}?)\s+on\s+\d/i);
+  if (card) return clean(/\batm\s+withdrawal\b/i.test(text) ? `ATM ${card[1]}` : card[1]);
   const vpa = text.match(/\b(?:to|by|from)\s+vpa\s+([A-Za-z0-9._-]+@[A-Za-z0-9.]+)(?:\s+([A-Za-z0-9][A-Za-z0-9 .&'()-]{1,60}?))?\s+on\b/i);
   if (vpa) return clean(vpa[2] && !/^on$/i.test(vpa[2]) ? vpa[2] : vpa[1]);
   const at = text.match(/\b(?:spent|used)\b[^\n]{0,80}?\bat\s+([A-Za-z0-9][A-Za-z0-9 .&'*-]{1,60}?)\s+on\b/i);
@@ -129,10 +163,29 @@ function findCounterparty(text: string): string {
   return info ? clean(info[1]) : '';
 }
 
+// Emails that mention money but record nothing: a payment that did not go through, a new payee, or
+// HDFC's forex fee notice, which repeats a card payment that has its own alert.
+const NOT_A_PAYMENT: [RegExp, string][] = [
+  [/\b(?:could\s+not\s+be\s+(?:completed|processed)|was\s+declined|has\s+been\s+declined|payment\s+unsuccessful|transaction\s+(?:has\s+)?failed)\b/i,
+    'A payment that did not go through, so nothing was recorded'],
+  [/\b(?:forex\s+conversion\s+markup|international\s+transaction\s+alert)\b/i,
+    'A notice about a card payment that has its own alert, so it was not counted twice'],
+  [/\b(?:addition\s+of\s+the\s+payee|payee\s+(?:has\s+been\s+)?added)\b/i, 'A new payee was added; no money moved'],
+];
+
+/** True for the note left on a bank email that is a notice rather than a payment, so it needs nothing doing. */
+export function isNoticeNote(note: string | null | undefined): boolean {
+  return NOT_A_PAYMENT.some(([, n]) => n === note);
+}
+
 /** Reads one alert. `body` may be plain text or HTML. */
 export function parseAlert(subject: string, body: string): ParsedAlert {
   const raw = /<[a-z][\s\S]*>/i.test(body) ? htmlToText(body) : body;
   const text = tidy(`${subject}\n${raw}`).slice(0, 6000);
+  const skip = NOT_A_PAYMENT.find(([re]) => re.test(text));
+  if (skip) {
+    return { readable: false, direction: null, amount_paise: null, last4: findLast4(text), reference_no: '', counterparty: '', balance_paise: null, note: skip[1] };
+  }
   const found = findAmount(text);
   // On a credit card the "available balance" is the unused limit, not money in the bank.
   const balance = /\bcredit\s*card\b/i.test(text) ? null : findBalance(text);

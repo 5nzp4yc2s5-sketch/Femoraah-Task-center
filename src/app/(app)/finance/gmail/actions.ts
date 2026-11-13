@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireFinance } from '@/lib/session';
 import { friendlyError } from '@/lib/format';
 import { revokeToken } from '@/lib/gmail';
-import { checkMailbox } from '@/lib/gmail-sync';
+import { checkMailbox, rereadMailbox } from '@/lib/gmail-sync';
 import type { ActionState } from '@/lib/types';
 
 const UUID = z.uuid();
@@ -31,6 +31,18 @@ export async function checkNowAction(_prev: ActionState, formData: FormData): Pr
   const { data } = await supabase.from('fin_gmail_connections').select('id').eq('id', id.data).is('disconnected_at', null).maybeSingle();
   if (!data) return { error: 'This mailbox is no longer connected.' };
   const r = await checkMailbox(id.data, me.memberId);
+  done();
+  return r.ok ? { ok: r.message } : { error: r.message };
+}
+
+export async function rereadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const me = await requireFinance();
+  const id = UUID.safeParse(formData.get('connection'));
+  if (!id.success) return { error: 'Mailbox not found' };
+  const supabase = await createClient();
+  const { data } = await supabase.from('fin_gmail_connections').select('id').eq('id', id.data).is('disconnected_at', null).maybeSingle();
+  if (!data) return { error: 'This mailbox is no longer connected.' };
+  const r = await rereadMailbox(id.data, me.memberId);
   done();
   return r.ok ? { ok: r.message } : { error: r.message };
 }
@@ -66,6 +78,14 @@ export async function assignAlertAction(_prev: ActionState, formData: FormData):
   const account = UUID.safeParse(formData.get('account'));
   if (!alert.success) return { error: 'Alert not found' };
   if (!account.success) return { error: 'Choose a bank account' };
+  const last4 = String(formData.get('last4') ?? '');
+  if (formData.get('remember') && /^\d{4}$/.test(last4)) {
+    const linked = await rpc('fin_account_link_card', { p_account: account.data, p_last4: last4 });
+    if (linked.error) return { error: linked.error };
+    done();
+    const n = Number(linked.data ?? 0);
+    return { ok: `Card ending ${last4} is now on this account. ${n} alert${n === 1 ? '' : 's'} recorded; check them under Transactions.` };
+  }
   const r = await rpc('fin_gmail_alert_assign', { p_alert: alert.data, p_account: account.data });
   if (r.error) return { error: r.error };
   done();

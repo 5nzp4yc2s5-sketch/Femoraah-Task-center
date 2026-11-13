@@ -2,7 +2,7 @@ import 'server-only';
 import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fromAddress, parseAlert, senderVerified } from '@/lib/bank-alerts';
-import { GoogleError, accessTokenFrom, googleConfig, readMessage, searchMessages } from '@/lib/gmail';
+import { GoogleError, accessTokenFrom, googleConfig, readMessage, searchMessages, type MailMessage } from '@/lib/gmail';
 import { zonedIso } from '@/lib/finance';
 
 // Checks a connected mailbox for new bank alert emails and records what they say. Runs on the
@@ -36,6 +36,38 @@ function summary(c: Counts, remaining: number): string {
   return `Read ${c.new} new alert${c.new === 1 ? '' : 's'}: ${parts.join(', ')}.${more}`;
 }
 
+/** What one email says, in the shape fin_gmail_record and fin_gmail_reread take. */
+function alertRow(m: MailMessage, senders: string[]): Record<string, unknown> {
+  const from = fromAddress(m.from);
+  const allowed = senderAllowed(from, senders);
+  const verified = allowed && senderVerified(m.authResults, from);
+  const parsed = verified ? parseAlert(m.subject, m.body) : null;
+  return {
+    message_id: m.id,
+    received_at: m.receivedAt,
+    sender: from,
+    subject: m.subject.slice(0, 200),
+    readable: parsed?.readable ?? false,
+    direction: parsed?.direction ?? null,
+    amount_paise: parsed?.amount_paise ?? null,
+    last4: parsed?.last4 ?? '',
+    reference_no: parsed?.reference_no ?? '',
+    counterparty: parsed?.counterparty ?? '',
+    balance_paise: parsed?.balance_paise ?? null,
+    note: !allowed ? 'Not from a bank alert address on the list'
+      : !verified ? 'Gmail could not confirm this email came from the bank, so it was not used'
+      : parsed?.note ?? '',
+  };
+}
+
+async function accessFor(admin: ReturnType<typeof createAdminClient>, connectionId: string): Promise<string> {
+  const { data: token, error } = await admin.rpc('fin_gmail_token', { p_id: connectionId });
+  if (error || typeof token !== 'string' || token.length < 20) {
+    throw new GoogleError('The saved Google permission could not be read. Connect the mailbox again.', 'no_token');
+  }
+  return accessTokenFrom(token);
+}
+
 /** Reads new alerts from one mailbox. `actor` is the person whose visit or button started it. */
 export async function checkMailbox(connectionId: string, actor: string | null): Promise<CheckResult> {
   const admin = createAdminClient();
@@ -56,11 +88,7 @@ export async function checkMailbox(connectionId: string, actor: string | null): 
   };
 
   try {
-    const { data: token, error: tokenError } = await admin.rpc('fin_gmail_token', { p_id: c.id });
-    if (tokenError || typeof token !== 'string' || token.length < 20) {
-      throw new GoogleError('The saved Google permission could not be read. Connect the mailbox again.', 'no_token');
-    }
-    const access = await accessTokenFrom(token);
+    const access = await accessFor(admin, c.id as string);
 
     const { data: settings } = await admin.from('app_settings').select('timezone').limit(1).maybeSingle();
     const tz = (settings?.timezone as string | undefined) ?? 'Asia/Kolkata';
@@ -83,24 +111,7 @@ export async function checkMailbox(connectionId: string, actor: string | null): 
       const messages = await Promise.all(batch.slice(i, i + 10).map((id) => readMessage(access, id)));
       for (const m of messages) {
         if (Date.parse(m.receivedAt) < fromMs) continue;
-        const from = fromAddress(m.from);
-        const allowed = senderAllowed(from, senders);
-        const verified = allowed && senderVerified(m.authResults, from);
-        const parsed = verified ? parseAlert(m.subject, m.body) : null;
-        alerts.push({
-          message_id: m.id,
-          received_at: m.receivedAt,
-          sender: from,
-          subject: m.subject.slice(0, 200),
-          readable: parsed?.readable ?? false,
-          direction: parsed?.direction ?? null,
-          amount_paise: parsed?.amount_paise ?? null,
-          last4: parsed?.last4 ?? '',
-          reference_no: parsed?.reference_no ?? '',
-          counterparty: parsed?.counterparty ?? '',
-          balance_paise: parsed?.balance_paise ?? null,
-          note: !allowed ? 'Not from a bank alert address on the list' : !verified ? 'Gmail could not confirm this email came from the bank, so it was not used' : '',
-        });
+        alerts.push(alertRow(m, senders));
         if (!seenUntil || m.receivedAt > seenUntil) seenUntil = m.receivedAt;
       }
     }
@@ -111,6 +122,53 @@ export async function checkMailbox(connectionId: string, actor: string | null): 
     const message = e instanceof GoogleError ? e.message : 'The check did not finish. Try again in a few minutes.';
     if (!(e instanceof GoogleError)) console.error('gmail check failed', e instanceof Error ? e.message : 'unknown error');
     await record([], null, false, message).catch(() => undefined);
+    return { ok: false, message };
+  }
+}
+
+const REREAD_LIMIT = 300;
+
+/**
+ * Reads again the emails already on file, with the current reader. Alerts not used yet are worked
+ * out afresh; transactions still waiting to be checked get a missing reference or payee filled in.
+ */
+export async function rereadMailbox(connectionId: string, actor: string): Promise<CheckResult> {
+  const admin = createAdminClient();
+  const { data: c } = await admin.from('fin_gmail_connections').select('id, senders').eq('id', connectionId).is('disconnected_at', null).maybeSingle();
+  if (!c) return { ok: false, message: 'This mailbox is no longer connected.' };
+  try {
+    const access = await accessFor(admin, c.id as string);
+    const senders = (c.senders as string[]).map((s) => s.toLowerCase());
+    const { data: rows } = await admin
+      .from('fin_gmail_alerts')
+      .select('message_id')
+      .eq('connection_id', c.id)
+      .neq('status', 'ignored')
+      .order('received_at', { ascending: false })
+      .limit(REREAD_LIMIT);
+    const ids = (rows ?? []).map((r) => r.message_id as string);
+    const alerts: Record<string, unknown>[] = [];
+    for (let i = 0; i < ids.length; i += 10) {
+      const got = await Promise.all(ids.slice(i, i + 10).map((id) => readMessage(access, id).catch((e) => {
+        if (e instanceof GoogleError && (e.code === 'NOT_FOUND' || e.code === 'http_404')) return null; // removed from the mailbox
+        throw e;
+      })));
+      for (const m of got) if (m) alerts.push(alertRow(m, senders));
+    }
+    const { data, error } = await admin.rpc('fin_gmail_reread', { p_connection: c.id, p_actor: actor, p_alerts: alerts });
+    if (error) throw new Error(error.message);
+    const n = data as Record<string, number>;
+    const parts = [
+      n.filled_in && `${n.filled_in} filled in with the reference or payee`,
+      n.recorded && `${n.recorded} newly recorded for checking`,
+      n.balance_only && `${n.balance_only} balance update${n.balance_only === 1 ? '' : 's'}`,
+      n.no_account && `${n.no_account} still need${n.no_account === 1 ? 's' : ''} an account chosen`,
+      n.unreadable && `${n.unreadable} not used`,
+    ].filter(Boolean);
+    return { ok: true, message: `Read ${n.read} email${n.read === 1 ? '' : 's'} again${parts.length ? `: ${parts.join(', ')}` : '. Nothing changed'}.` };
+  } catch (e) {
+    const message = e instanceof GoogleError ? e.message : 'Reading again did not finish. Try again in a few minutes.';
+    if (!(e instanceof GoogleError)) console.error('gmail re-read failed', e instanceof Error ? e.message : 'unknown error');
     return { ok: false, message };
   }
 }

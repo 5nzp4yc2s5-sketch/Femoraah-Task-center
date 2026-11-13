@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromAddress, htmlToText, parseAlert, senderVerified, toPaise } from '../../src/lib/bank-alerts';
+import { fromAddress, htmlToText, isNoticeNote, parseAlert, senderVerified, toPaise } from '../../src/lib/bank-alerts';
 
 // These alert texts follow the usual wording of HDFC Bank's InstaAlerts. They are written for the
 // test, with made-up names, numbers and amounts; they are not copies of real emails.
@@ -19,7 +19,102 @@ const NEFT_DEBIT =
 const CARD_SPEND =
   'Rs.1,250.00 spent on HDFC Bank Credit Card ending 5678 at AMAZON PAY INDIA on 2026-11-07:12:30:45. Avl bal: Rs.98,750.00. Not you? Call 18002586161';
 const BALANCE_ONLY = 'Dear Customer, the available balance in your A/c XX1234 as on 08-NOV-26 is INR 12,34,567.89. Warm Regards, HDFC Bank';
+// The wording HDFC Bank used in November 2026 for each kind of alert (alerts@hdfcbank.bank.in). Names,
+// numbers and amounts are made up.
+const H_DEPOSIT_SUBJECT = '\u2757 New Deposit Alert: Check your A/c balance now!';
+const H_DEPOSIT =
+  'Dear Customer, You have received a credit in your HDFC Bank account. Details of the transaction: Amount received: INR 12,345.67 ' +
+  'Account: XX1234 Date: 13-NOV-2026 Reference Details: NEFT Cr-ABCD0123456-ACME RETAIL PRIVATE LIMITED-OUR COMPANY PRIVATE LIMITED-ABCDH12345678901 ' +
+  'Available Balance: INR 1,54,321.08 For real-time account balance, please call 1800 270 3333. Thank you for banking with HDFC Bank. Warm Regards, HDFC Bank';
+const H_DEPOSIT_FT =
+  'Dear Customer, You have received a credit in your HDFC Bank account. Details of the transaction: Amount received: INR 1,23456.78 ' +
+  'Account: XX1234 Date: 10-NOV-2026 Reference Details: FT- CID123456-ACME RETAIL PRIVATE LIMITED Available Balance: INR 3,21,000.50 ' +
+  'For real-time account balance, please call 1800 270 3333.';
+const H_UPDATE_SUBJECT = 'View: Account update for your HDFC Bank A/c';
+const H_NEFT_OUT =
+  'Dear Customer, Thank you for banking with HDFC Bank. Rs. 120000 has been deducted from your HDFC Bank account ending in XX1234 ' +
+  "for a transfer to payee Vendor A via NEFT using HDFC Bank Online Banking. Not you? Call 18002586161/SMS 'BLOCK OB' to 7308080808 from your registered mobile number. Warm Regards, HDFC Bank";
+const H_RTGS_OUT =
+  'Dear Customer, Thank you for banking with HDFC Bank. You have successfully initiated RTGS transaction of Rs. 250000 from your HDFC Bank A/c XX1234 ' +
+  'for a transfer to payee Vendor A using HDFC Bank Online Banking. Not you? Call 18002586161.';
+const H_CARD_SUBJECT = 'Rs.555.30 debited via Debit Card **5678';
+const H_CARD =
+  'Dear Customer, Greetings from HDFC Bank! Rs.555.30 is debited from your HDFC Bank Debit Card ending 5678 at Corner Store and Co on 10 Nov, 2026 at 08:41:41. ' +
+  'For more details on this transaction, please log in to NetBanking -> Accounts. If you did not authorize this transaction, please report it immediately at: ' +
+  '1. When in India (Toll free): 1800 258 6161 2. When abroad: +9122 61606160 3. Or SMS "BLOCK DEBIT CARD 5678" to 7308080808';
+const H_ATM =
+  'Dear Card Holder, Thank you for using your HDFC Bank Debit Card ending 5678 for ATM withdrawal for Rs 5000.00 in SAMPLE CITY at SAMPLE EAST BRANCH on 08-11-2026 12:00:00. ' +
+  'After the above transaction, the total available balance on your card is Rs 41234.50. For more details on this transaction please visit Netbanking-Login here - Accounts.';
+const H_REVERSAL =
+  'Dear Card Member, We note that a transaction for Rs 850.00, on your HDFC Bank Debit Card ending 5678 at TRAVEL SITE INDIA PVT L on 26-10-2026 20:00:00 is reversed. ' +
+  'Contact Bank if refund is not received in 7 working days.';
+const H_PAYEE_ADDED =
+  'Dear Customer, Thank you for banking with HDFC Bank. An addition of the payee Vendor A with Account number ending with XX9999 is done using HDFC Bank Online Banking.';
+const H_FOREX_SUBJECT = 'Important: Forex Conversion Markup Fee on cross border transaction using Debit Card Transaction';
+const H_FOREX =
+  'Dear Customer, Thank you for choosing HDFC Bank! Recent International Transaction Alert: Your HDFC Bank Debit Card ending in XX5678 was used for an ' +
+  'international purchase of INR 1234.56 on 15/10/2026 at SHOP.COM. A markup fee of 3.5% plus taxes will be charged.';
+const H_DECLINED_SUBJECT = 'Payment Unsuccessful - Online usage disabled on your HDFC Bank Debit Card ending with 5678';
+const H_DECLINED =
+  "Dear Customer, Greetings from HDFC Bank! Here is an important update for you. We'd like to inform you that a transaction using your HDFC Bank Debit Card " +
+  'ending with 5678 could not be completed. Transaction amount: Rs. 1,499.00 at SHOP.COM.';
 const PROMO = 'Get a pre-approved personal loan of up to Rs. 10,00,000 instantly. Apply now on NetBanking.';
+
+describe('HDFC Bank alerts as sent in November 2026', () => {
+  it('marks failed payments, forex fee notices and new payees as notices that need nothing doing', () => {
+    for (const [subject, body] of [[H_DECLINED_SUBJECT, H_DECLINED], [H_FOREX_SUBJECT, H_FOREX], [H_UPDATE_SUBJECT, H_PAYEE_ADDED]]) {
+      expect(isNoticeNote(parseAlert(subject, body).note)).toBe(true);
+    }
+    expect(isNoticeNote(parseAlert(H_CARD_SUBJECT, H_CARD).note)).toBe(false);
+    expect(isNoticeNote('The app could not read the amount from this email')).toBe(false);
+    expect(isNoticeNote('')).toBe(false);
+  });
+  it('reads a deposit with the payer, the UTR and the balance', () => {
+    expect(parseAlert(H_DEPOSIT_SUBJECT, H_DEPOSIT)).toEqual({
+      readable: true, direction: 'in', amount_paise: 1234567, last4: '1234', reference_no: 'ABCDH12345678901',
+      counterparty: 'ACME RETAIL PRIVATE LIMITED', balance_paise: 15432108,
+    });
+  });
+
+  it('reads a fund transfer deposit but does not take the customer number as its reference', () => {
+    const r = parseAlert(H_DEPOSIT_SUBJECT, H_DEPOSIT_FT);
+    expect(r).toMatchObject({ direction: 'in', amount_paise: 12345678, last4: '1234', reference_no: '', balance_paise: 32100050 });
+  });
+
+  it('reads an online banking transfer out with the payee', () => {
+    expect(parseAlert(H_UPDATE_SUBJECT, H_NEFT_OUT)).toEqual({
+      readable: true, direction: 'out', amount_paise: 12000000, last4: '1234', reference_no: '', counterparty: 'Vendor A', balance_paise: null,
+    });
+  });
+
+  it('reads an RTGS transfer that was started', () => {
+    expect(parseAlert(H_UPDATE_SUBJECT, H_RTGS_OUT)).toMatchObject({ readable: true, direction: 'out', amount_paise: 25000000, last4: '1234', counterparty: 'Vendor A' });
+  });
+
+  it('reads a debit card payment with the shop and the card digits', () => {
+    expect(parseAlert(H_CARD_SUBJECT, H_CARD)).toEqual({
+      readable: true, direction: 'out', amount_paise: 55530, last4: '5678', reference_no: '', counterparty: 'Corner Store and Co', balance_paise: null,
+    });
+  });
+
+  it('reads an ATM withdrawal and the balance after it', () => {
+    expect(parseAlert(H_UPDATE_SUBJECT, H_ATM)).toEqual({
+      readable: true, direction: 'out', amount_paise: 500000, last4: '5678', reference_no: '', counterparty: 'ATM SAMPLE EAST BRANCH', balance_paise: 4123450,
+    });
+  });
+
+  it('reads a reversed card payment as money in', () => {
+    expect(parseAlert(H_UPDATE_SUBJECT, H_REVERSAL)).toMatchObject({ readable: true, direction: 'in', amount_paise: 85000, last4: '5678', counterparty: 'TRAVEL SITE INDIA PVT L' });
+  });
+
+  it('records nothing for a new payee, a forex fee notice or a payment that failed', () => {
+    for (const [subject, body] of [[H_UPDATE_SUBJECT, H_PAYEE_ADDED], [H_FOREX_SUBJECT, H_FOREX], [H_DECLINED_SUBJECT, H_DECLINED]]) {
+      const r = parseAlert(subject, body);
+      expect(r).toMatchObject({ readable: false, direction: null, amount_paise: null, balance_paise: null });
+      expect(r.note).toBeTruthy();
+    }
+  });
+});
 
 describe('toPaise', () => {
   it('reads Indian and plain amounts', () => {

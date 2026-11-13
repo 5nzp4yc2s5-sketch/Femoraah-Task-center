@@ -5,11 +5,12 @@ import { fmtDate } from '@/lib/format';
 import { googleConfig } from '@/lib/gmail';
 import { checkStaleSoon } from '@/lib/gmail-sync';
 import { inr, localParts, plusDays, todayIn } from '@/lib/finance';
+import { isNoticeNote } from '@/lib/bank-alerts';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { EmptyState, Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { loadAccounts } from '../data';
 import { Field, accountName } from '../parts';
-import { assignAlertAction, checkNowAction, confirmTxnsAction, disconnectAction, ignoreAlertAction, saveSendersAction } from './actions';
+import { assignAlertAction, checkNowAction, confirmTxnsAction, disconnectAction, ignoreAlertAction, rereadAction, saveSendersAction } from './actions';
 
 export const metadata = { title: 'Bank emails' };
 export const maxDuration = 60;
@@ -76,9 +77,14 @@ export default async function BankEmailsPage({ searchParams }: { searchParams: P
   ]);
   const connections = (conns ?? []) as Connection[];
   const alerts = ((alertRows ?? []) as Alert[]).map((a) => ({ ...a, amount_paise: a.amount_paise == null ? null : Number(a.amount_paise), balance_paise: a.balance_paise == null ? null : Number(a.balance_paise) }));
-  const open = alerts.filter((a) => a.status === 'no_account' || a.status === 'unreadable');
+  // Notices such as a failed payment or a forex fee are not payments, so they need nothing doing.
+  const notice = (a: Alert) => a.status === 'unreadable' && isNoticeNote(a.note);
+  const open = alerts.filter((a) => a.status === 'no_account' || (a.status === 'unreadable' && !notice(a)));
   const reviewIds = (toCheck ?? []).map((t) => t.id as string);
   const byId = new Map(accounts.map((a) => [a.id, a]));
+  const accountDigits = new Set(accounts.flatMap((a) => [a.last4, a.card_last4]).filter(Boolean));
+  const openByDigits = new Map<string, number>();
+  for (const a of open) if (a.status === 'no_account' && a.last4) openByDigits.set(a.last4, (openByDigits.get(a.last4) ?? 0) + 1);
   const configured = Boolean(googleConfig());
   const when = (iso: string) => {
     const p = localParts(iso, tz);
@@ -135,6 +141,10 @@ export default async function BankEmailsPage({ searchParams }: { searchParams: P
                   <input type="hidden" name="connection" value={c.id} />
                   <SubmitButton pendingText="Checking…">Check for new alerts</SubmitButton>
                 </ActionForm>
+                <ActionForm action={rereadAction}>
+                  <input type="hidden" name="connection" value={c.id} />
+                  <SubmitButton className="btn-secondary" pendingText="Reading again…">Read again</SubmitButton>
+                </ActionForm>
                 {me.isAdmin && (
                   <ConfirmAction
                     action={disconnectAction}
@@ -190,18 +200,25 @@ export default async function BankEmailsPage({ searchParams }: { searchParams: P
                     {a.amount_paise != null ? `${a.direction === 'in' ? 'Money in' : 'Money out'} ${inr(a.amount_paise)}` : a.balance_paise != null ? `Balance ${inr(a.balance_paise)}` : a.subject || 'Bank email'}
                     {a.counterparty && <span className="font-normal text-slate-600"> · {a.counterparty}</span>}
                   </div>
-                  <div className="text-xs text-slate-500">{when(a.received_at)}{a.reference_no && ` · Ref ${a.reference_no}`}{a.last4 && ` · account ending ${a.last4}`}</div>
+                  <div className="text-xs text-slate-500">{when(a.received_at)}{a.reference_no && ` · Ref ${a.reference_no}`}{a.last4 && ` · account or card ending ${a.last4}`}</div>
                   <div className="mt-1 text-amber-800">{a.note}</div>
                 </div>
                 <div className="flex flex-wrap items-start gap-2">
                   {a.status === 'no_account' && accounts.length > 0 && (
-                    <ActionForm action={assignAlertAction} className="flex gap-2">
+                    <ActionForm action={assignAlertAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="alert" value={a.id} />
-                      <select name="account" className="input" aria-label="Bank account" required defaultValue="">
+                      <input type="hidden" name="last4" value={a.last4} />
+                      <select name="account" className="input w-auto" aria-label="Bank account" required defaultValue="">
                         <option value="" disabled>Choose account…</option>
                         {accounts.map((x) => <option key={x.id} value={x.id}>{accountName(x)}</option>)}
                       </select>
                       <SubmitButton className="btn-secondary" pendingText="Recording…">Record</SubmitButton>
+                      {a.last4 && !accountDigits.has(a.last4) && (
+                        <label className="flex basis-full items-center gap-2 text-xs text-slate-700">
+                          <input type="checkbox" name="remember" value="1" defaultChecked={(openByDigits.get(a.last4) ?? 0) > 1} />
+                          It&apos;s a debit card on this account: record all {openByDigits.get(a.last4) ?? 1} ending {a.last4}, and future ones
+                        </label>
+                      )}
                     </ActionForm>
                   )}
                   <a className="btn-ghost" href={`https://mail.google.com/mail/u/0/#all/${a.message_id}`} target="_blank" rel="noreferrer noopener">Open in Gmail</a>
@@ -241,14 +258,15 @@ export default async function BankEmailsPage({ searchParams }: { searchParams: P
                       <td className="max-w-xs text-sm">
                         <div className="truncate">{a.counterparty || a.subject || 'Bank email'}</div>
                         {a.balance_paise != null && <div className="text-xs text-slate-500">Balance {inr(a.balance_paise)}</div>}
+                        {notice(a) && <div className="text-xs text-slate-500">{a.note}</div>}
                       </td>
                       <td className="whitespace-nowrap text-sm">{a.account_id ? accountName(byId.get(a.account_id)) : a.last4 ? `ending ${a.last4}` : '—'}</td>
                       <td className="font-mono text-xs">{a.reference_no}</td>
                       <td className="whitespace-nowrap text-right text-sm tabular-nums">
                         {a.amount_paise != null ? <span className={a.direction === 'in' ? 'text-green-700' : ''}>{a.direction === 'in' ? '+' : '−'}{inr(a.amount_paise)}</span> : '—'}
                       </td>
-                      <td className={`whitespace-nowrap text-sm ${STATUS[a.status]?.tone ?? ''}`}>
-                        {a.transaction_id ? <Link href={`/finance/transactions/${a.transaction_id}`} className="hover:underline">{STATUS[a.status]?.label}</Link> : STATUS[a.status]?.label}
+                      <td className={`whitespace-nowrap text-sm ${notice(a) ? 'text-slate-500' : STATUS[a.status]?.tone ?? ''}`}>
+                        {notice(a) ? 'Not a payment' : a.transaction_id ? <Link href={`/finance/transactions/${a.transaction_id}`} className="hover:underline">{STATUS[a.status]?.label}</Link> : STATUS[a.status]?.label}
                       </td>
                     </tr>
                   ))}

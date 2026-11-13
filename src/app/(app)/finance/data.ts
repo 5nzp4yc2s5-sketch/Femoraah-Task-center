@@ -33,7 +33,7 @@ export async function loadSettings(supabase: Client): Promise<FinSettings> {
 }
 
 export async function loadAccounts(supabase: Client, includeArchived = false): Promise<FinAccount[]> {
-  let q = supabase.from('fin_accounts').select('id, name, bank, last4, kind, notes, archived_at').order('created_at');
+  let q = supabase.from('fin_accounts').select('id, name, bank, last4, card_last4, kind, notes, archived_at').order('created_at');
   if (!includeArchived) q = q.is('archived_at', null);
   const { data } = await q;
   return (data ?? []) as FinAccount[];
