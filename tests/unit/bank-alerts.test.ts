@@ -58,13 +58,17 @@ const H_DECLINED_SUBJECT = 'Payment Unsuccessful - Online usage disabled on your
 const H_DECLINED =
   "Dear Customer, Greetings from HDFC Bank! Here is an important update for you. We'd like to inform you that a transaction using your HDFC Bank Debit Card " +
   'ending with 5678 could not be completed. Transaction amount: Rs. 1,499.00 at SHOP.COM.';
+const H_CARD_SETTINGS =
+  'Dear Customer, Thank you for Banking with us. This is to inform you have modified Card usage settings for Debit Card ending with 5678 on ' +
+  '2026-10-15T14:48:18 05:30 via Online Banking. To modify the same, please log in to NetBanking or MobileBanking App. Regards, HDFC Bank';
 const PROMO = 'Get a pre-approved personal loan of up to Rs. 10,00,000 instantly. Apply now on NetBanking.';
 
 describe('HDFC Bank alerts as sent in November 2026', () => {
   it('marks failed payments, forex fee notices and new payees as notices that need nothing doing', () => {
-    for (const [subject, body] of [[H_DECLINED_SUBJECT, H_DECLINED], [H_FOREX_SUBJECT, H_FOREX], [H_UPDATE_SUBJECT, H_PAYEE_ADDED]]) {
+    for (const [subject, body] of [[H_DECLINED_SUBJECT, H_DECLINED], [H_FOREX_SUBJECT, H_FOREX], [H_UPDATE_SUBJECT, H_PAYEE_ADDED], [H_UPDATE_SUBJECT, H_CARD_SETTINGS]]) {
       expect(isNoticeNote(parseAlert(subject, body).note)).toBe(true);
     }
+    expect(parseAlert(H_UPDATE_SUBJECT, H_CARD_SETTINGS)).toMatchObject({ readable: false, amount_paise: null, last4: '5678', note: 'Debit card settings were changed; no money moved' });
     expect(isNoticeNote(parseAlert(H_CARD_SUBJECT, H_CARD).note)).toBe(false);
     expect(isNoticeNote('The app could not read the amount from this email')).toBe(false);
     expect(isNoticeNote('')).toBe(false);

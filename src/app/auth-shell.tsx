@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { getBrand, initials } from '@/lib/brand';
+import { cashflowOnly, CASHFLOW_NAME } from '@/lib/app-mode';
 
 export async function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   const brand = await getBrand();
@@ -15,7 +16,7 @@ export async function AuthShell({ title, subtitle, children }: { title: string; 
           )}
           <span>
             <span className="block text-lg font-semibold leading-tight">{brand.companyName}</span>
-            <span className="block text-xs uppercase tracking-wider text-navy-100/75">{brand.tagline}</span>
+            <span className="block text-xs uppercase tracking-wider text-navy-100/75">{cashflowOnly() ? CASHFLOW_NAME : brand.tagline}</span>
           </span>
         </div>
         <div className="rounded-2xl bg-white p-6 shadow-xl">

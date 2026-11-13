@@ -45,6 +45,8 @@ export function Sidebar({
   isManager,
   canSettings,
   canFinance = false,
+  cashflowApp = false,
+  isAdmin = false,
   signOut,
   brand: b,
 }: {
@@ -55,6 +57,9 @@ export function Sidebar({
   canSettings: boolean;
   /** Can open Cash Flow (Super Admin or Finance access). */
   canFinance?: boolean;
+  /** The separate Cash Flow app: only Cash Flow, and Team for the Super Admin. */
+  cashflowApp?: boolean;
+  isAdmin?: boolean;
   signOut: () => Promise<void>;
   brand: SidebarBrand;
 }) {
@@ -64,7 +69,11 @@ export function Sidebar({
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 px-3 py-4" aria-label="Main">
-      {ITEMS.filter((i) => (!i.managerOnly || isManager) && (!i.settingsOnly || canSettings) && (!i.financeOnly || canFinance)).map((i) => (
+      {ITEMS.filter((i) =>
+        cashflowApp
+          ? (i.href === '/finance' && canFinance) || (i.href === '/team' && isAdmin)
+          : (!i.managerOnly || isManager) && (!i.settingsOnly || canSettings) && (!i.financeOnly || canFinance),
+      ).map((i) => (
         <Link
           key={i.href}
           href={i.href}
@@ -108,7 +117,7 @@ export function Sidebar({
       )}
       <span className="min-w-0 leading-tight">
         <span className="block truncate text-sm font-semibold text-white">{b.short}</span>
-        <span className="block truncate text-[11px] uppercase tracking-wider text-navy-100/70">{b.tagline}</span>
+        <span className="block truncate text-[11px] uppercase tracking-wider text-navy-100/70">{cashflowApp ? 'Cash Flow' : b.tagline}</span>
       </span>
     </div>
   );

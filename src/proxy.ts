@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { cashflowOnly, cashflowServes } from '@/lib/app-mode';
 
 // Refreshes the Supabase session cookie on every request and sends signed-out visitors to /login.
 // Authorization itself is enforced by RLS in the database, not here.
@@ -26,6 +27,13 @@ export async function proxy(request: NextRequest) {
   if (!signedIn && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+  // The separate Cash Flow app serves only Cash Flow; anything else goes to its home page.
+  if (signedIn && cashflowOnly() && !cashflowServes(path)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
     url.search = '';
     return NextResponse.redirect(url);
   }

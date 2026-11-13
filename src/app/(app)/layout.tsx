@@ -3,6 +3,7 @@ import { getBrand, sidebarBrand } from '@/lib/brand';
 import { Sidebar } from '@/components/sidebar';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { ROLE_LABELS } from '@/lib/types';
+import { cashflowOnly } from '@/lib/app-mode';
 import { signOutAction } from '../auth-actions';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         canFinance={canFinance}
         signOut={signOutAction}
         brand={sidebarBrand(brand)}
+        cashflowApp={cashflowOnly()}
+        isAdmin={me.isAdmin}
       />
       <main className="lg:pl-64">
         <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">{children}</div>

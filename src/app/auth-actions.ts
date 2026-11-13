@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { cashflowOnly, FINANCE_ONLY_MESSAGE } from '@/lib/app-mode';
 import type { ActionState } from '@/lib/types';
 
 const GENERIC = 'Username or PIN is incorrect.';
@@ -42,6 +43,15 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
   const { error: otpErr } = await supabase.auth.verifyOtp({ type: 'email', token_hash: tokenHash });
   if (otpErr) return { error: UNAVAILABLE };
   const { data: verified } = await supabase.rpc('verify_pin', { p_pin: pin });
+  // The separate Cash Flow app lets in only the Super Admin and people with Finance access.
+  if (cashflowOnly() && verified?.ok) {
+    const { data: finance } = await supabase.rpc('my_finance_access');
+    if (finance !== true) {
+      await supabase.rpc('end_session');
+      await supabase.auth.signOut({ scope: 'local' });
+      return { error: FINANCE_ONLY_MESSAGE };
+    }
+  }
   await admin.rpc('service_record_login', { p_identifier: identifier, p_ip: ip, p_success: true });
   redirect(verified?.ok ? '/' : '/verify');
 }

@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from 'next';
 import { brandCss, getBrand } from '@/lib/brand';
 import { DEFAULT_BRAND } from '@/lib/colors';
+import { cashflowOnly, CASHFLOW_NAME } from '@/lib/app-mode';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrand();
-  const short = brand.savedName ?? 'OpsPulse';
+  const short = cashflowOnly() ? CASHFLOW_NAME : (brand.savedName ?? 'OpsPulse');
   return {
-    title: { default: brand.companyName, template: `%s · ${short}` },
+    title: { default: cashflowOnly() ? CASHFLOW_NAME : brand.companyName, template: `%s · ${short}` },
     description: brand.tagline,
     robots: { index: false, follow: false },
   };

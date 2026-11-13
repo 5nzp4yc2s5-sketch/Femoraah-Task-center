@@ -171,6 +171,8 @@ const NOT_A_PAYMENT: [RegExp, string][] = [
   [/\b(?:forex\s+conversion\s+markup|international\s+transaction\s+alert)\b/i,
     'A notice about a card payment that has its own alert, so it was not counted twice'],
   [/\b(?:addition\s+of\s+the\s+payee|payee\s+(?:has\s+been\s+)?added)\b/i, 'A new payee was added; no money moved'],
+  [/\bmodified\s+(?:the\s+)?card\s+usage\s+settings\b|\bcard\s+usage\s+settings\s+(?:have\s+been\s+|were\s+)?(?:modified|changed|updated)\b/i,
+    'Debit card settings were changed; no money moved'],
 ];
 
 /** True for the note left on a bank email that is a notice rather than a payment, so it needs nothing doing. */

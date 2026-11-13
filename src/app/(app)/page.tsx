@@ -1,5 +1,8 @@
 import Link from 'next/link';
-import { requireMe } from '@/lib/session';
+import { redirect } from 'next/navigation';
+import { getFinanceAccess, requireMe } from '@/lib/session';
+import { cashflowOnly, FINANCE_ONLY_MESSAGE } from '@/lib/app-mode';
+import { signOutAction } from '../auth-actions';
 import { createClient } from '@/lib/supabase/server';
 import { routinesFor, sortTasks } from '@/lib/data';
 import { addDays, fmtClock, fmtDate, fmtMinutes, friendlyError } from '@/lib/format';
@@ -55,6 +58,15 @@ function weekEnd(d: string): string {
 export default async function MyDashboard({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const sp = await searchParams;
   const me = await requireMe();
+  if (cashflowOnly()) {
+    if (await getFinanceAccess(me.role)) redirect('/finance');
+    return (
+      <div className="max-w-xl">
+        <Notice tone="warn">{FINANCE_ONLY_MESSAGE}</Notice>
+        <form action={signOutAction} className="mt-4"><button type="submit" className="btn-secondary">Sign out</button></form>
+      </div>
+    );
+  }
   const supabase = await createClient();
   const [
     { data: summaryData, error: summaryError },
