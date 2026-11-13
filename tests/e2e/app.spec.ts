@@ -1061,3 +1061,49 @@ test('Cash Flow: only the Super Admin and people given Finance access; balances,
   await zinia.goto('/finance');
   await expect(zinia).toHaveURL(/error=finance-only/);
 });
+
+test('Cash Flow: a bank statement fills in what the bank emails missed, once', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const admin = await as(browser, ADMIN);
+  // Laid out like HDFC's Delimited download; made-up names and amounts. The last balance is the
+  // account's opening balance, so every day adds up afterwards.
+  const ddmmyy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
+  const row = (date: string, narration: string, debit: string, credit: string, ref: string, balance: string) =>
+    [` ${ddmmyy(date)}  `, narration.padEnd(60), ddmmyy(date), debit.padStart(14), credit.padStart(14), ref.padEnd(16), balance.padStart(14)].join(',');
+  const statement = [
+    '  HDFC BANK Ltd.',
+    ' Date     ,Narration                                                   ,Value Dat,Debit Amount  ,Credit Amount ,Chq/Ref Number  ,Closing Balance',
+    row(isoIn(-2), 'UPI-VENDOR B PACKAGING-VENDORB@OKHDFCBANK-HDFC0001234-530912345678-PAYMENT', '2500.00', '0.00', '0000530912345678', '1485017.70'),
+    row(isoIn(-1), 'UPI-ABC TRADERS-ABC.TRADERS@OKAXIS-UTIB0000123-531012345678-RECEIPT', '0.00', '15000.00', '0000531012345678', '1500017.70'),
+    row(isoIn(-1), 'SMS ALERT CHARGES OCT26 INCL GST', '17.70', '0.00', '0000000000000000', '1500000.00'),
+  ].join('\r\n');
+  const upload = async (name: string, body: string) => {
+    await admin.getByLabel('Statement file (.txt or .csv)').setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from(body) });
+    await admin.getByRole('button', { name: 'Upload statement' }).click();
+  };
+
+  await admin.goto('/finance/accounts');
+  await admin.locator('table').getByRole('link', { name: /HDFC Current/ }).first().click();
+  await expect(admin.getByRole('heading', { name: /HDFC Current/ })).toBeVisible();
+  await expect(admin.getByText("This needs the bank's balance on at least two days in the last 90 days.")).toBeVisible();
+
+  // Only text statements: an Excel download is turned away with what to do instead
+  await upload('statement.xls', 'not really excel');
+  await expect(admin.getByText('This is an Excel file. In net banking, download the statement in the Delimited format (a .txt file) and upload that.')).toBeVisible();
+
+  await upload('Acct_Statement_XX1234.txt', statement);
+  await expect(admin.getByRole('status')).toContainText('Read 3 transactions from');
+  await expect(admin.getByRole('status')).toContainText('3 were missing and are now added for you to check under Transactions.');
+  await expect(admin.getByRole('status')).toContainText("The bank's end-of-day balance is recorded for 2 days.");
+  await admin.reload();
+  await expect(admin.getByRole('link', { name: 'ABC TRADERS' })).toBeVisible();
+  await expect(admin.getByRole('link', { name: 'VENDOR B PACKAGING' })).toBeVisible();
+  await expect(admin.getByText("All 2 stretches between the bank's balances in the last 90 days add up.")).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/44-cashflow-statement.png`, fullPage: true });
+
+  // The same statement again adds nothing
+  await upload('Acct_Statement_XX1234.txt', statement);
+  await expect(admin.getByRole('status')).toContainText('3 were brought in from a statement before.');
+  await admin.goto('/finance/transactions?review=1');
+  await expect(admin.getByRole('link', { name: 'ABC TRADERS' })).toHaveCount(1);
+});

@@ -92,6 +92,10 @@ const ACTIONS: Record<string, string> = {
   status_cancelled: 'Cancelled',
   status_disputed: 'Marked as disputed',
   status_written_off: 'Written off',
+  confirmed: 'Checked and confirmed',
+  details_filled: 'Details filled in',
+  card_linked: 'Debit card changed',
+  statement_imported: 'Bank statement uploaded',
 };
 
 function eventDetail(e: FinEvent): string {
@@ -122,6 +126,20 @@ function eventDetail(e: FinEvent): string {
     }
   } else if (e.action === 'voided') {
     parts.push(money('amount'));
+  } else if (e.action === 'details_filled') {
+    const filled = (k: string, label: string) => {
+      const v = d[k] as { before?: string; after?: string } | undefined;
+      if (v && v.after && v.after !== v.before) parts.push(`${label} ${v.after}`);
+    };
+    filled('counterparty', 'payee');
+    filled('reference_no', 'reference');
+    parts.push(d.by === 'statement' ? 'from a bank statement' : 'from the bank email');
+  } else if (e.action === 'card_linked') {
+    parts.push(d.after ? `card ending ${d.after}` : 'card removed');
+  } else if (e.action === 'statement_imported' && d.from) {
+    const n = (k: string) => Number(d[k] ?? 0);
+    parts.push(`${fmtDate(String(d.from))} to ${fmtDate(String(d.to))}`, `${n('added')} added`, `${n('matched')} already recorded`);
+    if (n('already')) parts.push(`${n('already')} brought in before`);
   }
   if (typeof d.reason === 'string' && d.reason) parts.push(`reason: ${d.reason}`);
   return parts.join(' · ');

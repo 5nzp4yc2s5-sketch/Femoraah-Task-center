@@ -10,6 +10,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Bank statements are uploaded through a server action (Cash Flow); the default limit is 1 MB.
+  experimental: { serverActions: { bodySizeLimit: '3mb' } },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

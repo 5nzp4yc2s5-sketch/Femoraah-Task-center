@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireFinance } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
-import { fmtDate } from '@/lib/format';
-import { accountBalances, localParts, todayIn } from '@/lib/finance';
+import { addDays, fmtDate } from '@/lib/format';
+import { accountBalances, balanceGaps, inr, localParts, todayIn } from '@/lib/finance';
 import { ActionForm, ConfirmAction, SubmitButton } from '@/components/forms';
 import { Notice, PageHeader, SectionTitle } from '@/components/ui';
 import { memberNames } from '../../../attendance/data';
 import { loadAccounts, loadEvents, loadReadings, loadTxns } from '../../data';
-import { archiveAccountAction, linkCardAction, recordBalanceAction, saveAccountAction } from '../../actions';
+import { archiveAccountAction, importStatementAction, linkCardAction, recordBalanceAction, saveAccountAction } from '../../actions';
 import { AccountFields } from '../../fields';
 import { BackLink, Fact, Field, History, Money, RupeeInput, accountKind, accountName, categoryName } from '../../parts';
 
@@ -30,6 +30,15 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
   const after = since ? await loadTxns(supabase, { accountId: id, since }) : [];
   const [bal] = accountBalances([account], readings, after);
   const today = todayIn(tz);
+  // Check the last 90 days against the bank's balances.
+  const checkFrom = addDays(today, -90);
+  const recent = readings.filter((r) => localParts(r.as_of, tz).date >= checkFrom);
+  const oldest = recent.length > 1 ? recent[recent.length - 1].as_of : null;
+  const checkTxns = oldest ? await loadTxns(supabase, { accountId: id, since: oldest }) : [];
+  const complete = checkTxns.length < 5000 ? recent : recent.filter((r) => r.as_of >= checkTxns[checkTxns.length - 1].txn_at);
+  const check = balanceGaps(complete, checkTxns, tz);
+  const missingIn = check.gaps.reduce((s, g) => (g.diff > 0 ? s + g.diff : s), 0);
+  const missingOut = check.gaps.reduce((s, g) => (g.diff < 0 ? s - g.diff : s), 0);
   const at = (iso: string) => {
     const p = localParts(iso, tz);
     return `${fmtDate(p.date)} ${p.time}`;
@@ -78,6 +87,53 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      {!account.archived_at && (
+        <ActionForm action={importStatementAction} resetOnSuccess className="card mt-4 space-y-3 p-4">
+          <h2 className="text-sm font-semibold text-navy-900">Upload a bank statement</h2>
+          <p className="text-xs text-slate-600">
+            Fills in the transactions the bank did not email you. In net banking, open this account&apos;s statement for the period you want, download it in the <strong>Delimited</strong> format, and upload that file here.
+            Transactions already recorded are matched, not added twice; the missing ones are added for you to check. Only the date, amount, reference, payee and balance are kept, not the file.
+          </p>
+          <input type="hidden" name="account" value={id} />
+          <Field label="Statement file (.txt or .csv)" htmlFor="stmt-file">
+            <input id="stmt-file" name="statement" type="file" accept=".txt,.csv,text/plain,text/csv" required className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-navy-800 hover:file:bg-slate-50" />
+          </Field>
+          <div className="flex justify-end"><SubmitButton>Upload statement</SubmitButton></div>
+        </ActionForm>
+      )}
+
+      <SectionTitle>Check against the bank</SectionTitle>
+      <div className="card p-4 text-sm">
+        {check.checked === 0 ? (
+          <p className="text-slate-600">This needs the bank&apos;s balance on at least two days in the last 90 days.</p>
+        ) : check.gaps.length === 0 ? (
+          <p className="text-green-800">All {check.checked} stretches between the bank&apos;s balances in the last 90 days add up.</p>
+        ) : (
+          <>
+            <p className="text-slate-800">
+              In {check.gaps.length} of {check.checked} stretches between the bank&apos;s balances, the recorded transactions do not add up.
+              Missing in all: <strong>{[missingOut > 0 && `${inr(missingOut)} out`, missingIn > 0 && `${inr(missingIn)} in`].filter(Boolean).join(' and ')}</strong>.
+              A statement for those days fills them in.
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="sheet">
+                <thead><tr><th>Between</th><th className="text-right">Missing</th></tr></thead>
+                <tbody>
+                  {check.gaps.slice(-10).reverse().map((g) => (
+                    <tr key={`${g.from}-${g.to}`}>
+                      <td className="whitespace-nowrap">{fmtDate(g.from)} and {fmtDate(g.to)}</td>
+                      <td className="text-right tabular-nums">{inr(Math.abs(g.diff))} {g.diff > 0 ? 'in' : 'out'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {check.gaps.length > 10 && <p className="mt-2 text-xs text-slate-500">Showing the latest 10.</p>}
+          </>
+        )}
+        <p className="mt-2 text-xs text-slate-500">Each day&apos;s last balance from the bank is compared with the next one. Transactions still to be checked are counted too.</p>
+      </div>
+
       <SectionTitle action={<Link href={`/finance/transactions?account=${id}`} className="text-sm text-navy-700 hover:underline">All transactions</Link>}>Recent transactions</SectionTitle>
       {txns.length === 0 ? (
         <p className="card p-4 text-sm text-slate-600">No transactions yet.</p>
@@ -104,7 +160,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
         <table className="sheet">
           <thead><tr><th>As on</th><th className="text-right">Balance</th><th>From</th><th>Note</th></tr></thead>
           <tbody>
-            {readings.map((r) => (
+            {readings.slice(0, 30).map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap text-sm">{at(r.as_of)}</td>
                 <td className="text-right"><Money paise={r.balance_paise} /></td>
@@ -114,6 +170,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             ))}
           </tbody>
         </table>
+        {readings.length > 30 && <p className="px-4 py-2 text-xs text-slate-500">Showing the latest 30 of {readings.length}.</p>}
       </div>
 
       {!account.archived_at && (

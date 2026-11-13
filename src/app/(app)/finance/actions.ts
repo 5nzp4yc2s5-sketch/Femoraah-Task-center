@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireFinance } from '@/lib/session';
 import { friendlyError, isIsoDate } from '@/lib/format';
 import { parseRupees, zonedIso } from '@/lib/finance';
+import { importSummary, parseStatement, type ImportCounts } from '@/lib/bank-statement';
 import type { ActionState } from '@/lib/types';
 
 const UUID = z.uuid();
@@ -129,6 +130,28 @@ export async function recordBalanceAction(_prev: ActionState, formData: FormData
   if (r.error) return { error: r.error };
   done(['/finance']);
   return { ok: 'Balance recorded. Transactions after this moment are added to it.' };
+}
+
+const STATEMENT_MAX_BYTES = 2_500_000;
+
+/** A bank statement downloaded from net banking. The file is read here and not kept; only the facts reach the database. */
+export async function importStatementAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireFinance();
+  const id = UUID.safeParse(formData.get('account'));
+  if (!id.success) return { error: 'Bank account not found' };
+  const file = formData.get('statement');
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose the statement file you downloaded from net banking' };
+  if (file.size > STATEMENT_MAX_BYTES) return { error: 'This file is too big. Download a shorter period, such as 3 months, and upload that.' };
+  const kind = /\.pdf$/i.test(file.name) ? 'a PDF' : /\.xlsx?$/i.test(file.name) ? 'an Excel file' : '';
+  if (kind) return { error: `This is ${kind}. In net banking, download the statement in the Delimited format (a .txt file) and upload that.` };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes.subarray(0, 8192).includes(0)) return { error: 'This is not a text file. In net banking, download the statement in the Delimited format and upload that.' };
+  const parsed = parseStatement(new TextDecoder('utf-8').decode(bytes));
+  if (parsed.problem) return { error: parsed.problem };
+  const r = await rpc('fin_statement_import', { p_account: id.data, p_lines: parsed.lines });
+  if (r.error) return { error: r.error };
+  done(['/finance']);
+  return { ok: importSummary(r.data as ImportCounts) };
 }
 
 // ---------------------------------------------------------------------------

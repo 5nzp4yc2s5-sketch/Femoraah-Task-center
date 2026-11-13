@@ -368,6 +368,38 @@ export function accountBalances(accounts: FinAccount[], readings: FinBalance[], 
   });
 }
 
+export interface BalanceGap {
+  /** Local dates of the two end-of-day balances. */
+  from: string;
+  to: string;
+  /** What the bank showed minus what the recorded transactions add up to: above zero means money in is missing. */
+  diff: number;
+}
+
+/**
+ * Checks the recorded transactions against the bank, one day at a time: from the last balance of one
+ * day to the last balance of the next day that has one, the transactions in between (including those
+ * still to be checked) should add up to the difference. A statement gives the bank's balance at the end
+ * of every day, so after one is uploaded every day it covers should add up.
+ */
+export function balanceGaps(readings: FinBalance[], txns: FinTxn[], timeZone: string): { checked: number; gaps: BalanceGap[] } {
+  const lastOfDay = new Map<string, FinBalance>();
+  for (const r of [...readings].sort((a, b) => a.as_of.localeCompare(b.as_of))) lastOfDay.set(localParts(r.as_of, timeZone).date, r);
+  const days = [...lastOfDay.entries()];
+  const moves = txns.filter((t) => !t.voided_at).map((t) => ({ at: Date.parse(t.txn_at), net: t.direction === 'in' ? t.amount_paise : -t.amount_paise }));
+  const gaps: BalanceGap[] = [];
+  for (let i = 1; i < days.length; i++) {
+    const [fromDay, a] = days[i - 1];
+    const [toDay, b] = days[i];
+    const start = Date.parse(a.as_of);
+    const end = Date.parse(b.as_of);
+    const net = moves.reduce((s, m) => (m.at > start && m.at <= end ? s + m.net : s), 0);
+    const diff = b.balance_paise - (a.balance_paise + net);
+    if (diff !== 0) gaps.push({ from: fromDay, to: toDay, diff });
+  }
+  return { checked: Math.max(days.length - 1, 0), gaps };
+}
+
 // ---------------------------------------------------------------------------
 // Forecast
 // ---------------------------------------------------------------------------
